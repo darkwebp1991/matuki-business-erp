@@ -429,18 +429,6 @@ export const CustomersView: React.FC<CustomersViewProps> = ({ initialSearch = ''
                       }}>
                         {c.name}
                       </div>
-
-                      {/* Small Risk Zone Tag */}
-                      {rZone === 'RED' && (
-                        <span style={{ fontSize: '0.62rem', background: '#fee2e2', color: '#dc2626', padding: '1px 5px', borderRadius: '4px', fontWeight: 800, border: '1px solid #fca5a5' }}>
-                          🔴 {daysOver}d+
-                        </span>
-                      )}
-                      {rZone === 'YELLOW' && (
-                        <span style={{ fontSize: '0.62rem', background: '#fef3c7', color: '#b45309', padding: '1px 5px', borderRadius: '4px', fontWeight: 800, border: '1px solid #fde68a' }}>
-                          🟡 {daysOver}d
-                        </span>
-                      )}
                     </div>
                     <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', marginTop: '2px' }}>
                       {c.mobile || 'No mobile'}
@@ -452,12 +440,12 @@ export const CustomersView: React.FC<CustomersViewProps> = ({ initialSearch = ''
                         fontWeight: 800,
                         fontFamily: 'var(--font-mono)',
                         fontSize: '0.84rem',
-                        color: c.current_balance > 0 ? (rZone === 'RED' ? '#dc2626' : 'var(--vyapar-green)') : 'var(--text-muted)'
+                        color: 'var(--vyapar-green)'
                       }}>
-                        {formatCurrency(c.current_balance)}
+                        {formatCurrency(c.current_balance > 0 ? c.current_balance : 0)}
                       </div>
-                      <span style={{ fontSize: '0.65rem', color: c.current_balance > 0 ? (rZone === 'RED' ? '#dc2626' : 'var(--vyapar-green)') : 'var(--text-muted)', fontWeight: 700 }}>
-                        {c.current_balance > 0 ? 'Receive' : 'Settled'}
+                      <span style={{ fontSize: '0.65rem', color: 'var(--vyapar-green)', fontWeight: 700 }}>
+                        {c.current_balance > 0 ? 'To Receive' : 'Settled'}
                       </span>
                     </div>
 
