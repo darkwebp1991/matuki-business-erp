@@ -206,6 +206,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ settings: propSettings
   // When party type changes, auto-select first party of that type
   const handlePartyTypeChange = (type: 'CUSTOMER' | 'SUPPLIER') => {
     setSelectedPartyType(type);
+    setPartySearchQuery('');
     const list = type === 'CUSTOMER' ? customers : suppliers;
     if (list.length > 0) {
       setSelectedPartyId(list[0].id);
@@ -511,6 +512,20 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ settings: propSettings
                       </button>
                     </div>
 
+                    {/* Live Party Search Input */}
+                    <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                      <Search size={14} color="#94a3b8" style={{ position: 'absolute', left: '8px', pointerEvents: 'none' }} />
+                      <input
+                        type="text"
+                        className="form-input"
+                        style={{ paddingLeft: '28px', fontSize: '0.8rem', padding: '4px 8px 4px 28px', width: '180px', fontWeight: 600 }}
+                        placeholder={`Search ${selectedPartyType === 'CUSTOMER' ? 'customer' : 'supplier'}...`}
+                        value={partySearchQuery}
+                        onChange={(e) => setPartySearchQuery(e.target.value)}
+                      />
+                    </div>
+
+                    {/* Party Dropdown */}
                     <select
                       className="form-select"
                       style={{ fontSize: '0.8rem', padding: '4px 10px', minWidth: '220px', fontWeight: 700, borderColor: '#94a3b8' }}
@@ -518,7 +533,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ settings: propSettings
                       onChange={(e) => setSelectedPartyId(Number(e.target.value))}
                     >
                       {filteredParties.length === 0 ? (
-                        <option value="">No parties found</option>
+                        <option value="">No {selectedPartyType === 'CUSTOMER' ? 'customers' : 'suppliers'} found</option>
                       ) : (
                         filteredParties.map(p => (
                           <option key={p.id} value={p.id}>
