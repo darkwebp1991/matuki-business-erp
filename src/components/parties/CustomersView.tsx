@@ -373,72 +373,7 @@ export const CustomersView: React.FC<CustomersViewProps> = ({ initialSearch = ''
             </div>
           </div>
 
-          {/* Risk Zone Filters: ALL / RED / YELLOW / GREEN */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '3px', marginTop: '6px' }}>
-            <button
-              style={{
-                fontSize: '0.68rem',
-                padding: '4px 1px',
-                borderRadius: 'var(--radius-sm)',
-                border: '1px solid var(--border-color)',
-                background: filterType === 'ALL' ? '#0f172a' : 'var(--bg-card)',
-                color: filterType === 'ALL' ? '#fff' : 'var(--text-secondary)',
-                fontWeight: 800,
-                cursor: 'pointer'
-              }}
-              onClick={() => setFilterType('ALL')}
-            >
-              All ({customers.length})
-            </button>
-            <button
-              style={{
-                fontSize: '0.68rem',
-                padding: '4px 1px',
-                borderRadius: 'var(--radius-sm)',
-                border: filterType === 'RED' ? '1.5px solid #dc2626' : '1px solid #fecaca',
-                background: filterType === 'RED' ? '#dc2626' : '#fef2f2',
-                color: filterType === 'RED' ? '#fff' : '#dc2626',
-                fontWeight: 800,
-                cursor: 'pointer'
-              }}
-              onClick={() => setFilterType('RED')}
-              title="30+ Days Overdue (Strict Follow-up Required)"
-            >
-              🔴 Red ({redCount})
-            </button>
-            <button
-              style={{
-                fontSize: '0.68rem',
-                padding: '4px 1px',
-                borderRadius: 'var(--radius-sm)',
-                border: filterType === 'YELLOW' ? '1.5px solid #d97706' : '1px solid #fde68a',
-                background: filterType === 'YELLOW' ? '#d97706' : '#fffbeb',
-                color: filterType === 'YELLOW' ? '#fff' : '#b45309',
-                fontWeight: 800,
-                cursor: 'pointer'
-              }}
-              onClick={() => setFilterType('YELLOW')}
-              title="15 to 30 Days Due"
-            >
-              🟡 Due ({yellowCount})
-            </button>
-            <button
-              style={{
-                fontSize: '0.68rem',
-                padding: '4px 1px',
-                borderRadius: 'var(--radius-sm)',
-                border: filterType === 'GREEN' ? '1.5px solid #16a34a' : '1px solid #bbf7d0',
-                background: filterType === 'GREEN' ? '#16a34a' : '#f0fdf4',
-                color: filterType === 'GREEN' ? '#fff' : '#15803d',
-                fontWeight: 800,
-                cursor: 'pointer'
-              }}
-              onClick={() => setFilterType('GREEN')}
-              title="Safe / Cleared Balance"
-            >
-              🟢 Safe ({greenCount})
-            </button>
-          </div>
+
         </div>
 
         {/* Scrollable Party List */}
