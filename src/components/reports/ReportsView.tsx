@@ -65,7 +65,7 @@ interface ReportsViewProps {
 
 export const ReportsView: React.FC<ReportsViewProps> = ({ settings: propSettings }) => {
   const [selectedReport, setSelectedReport] = useState<ReportKey>('profit_and_loss');
-  const [startDate, setStartDate] = useState<string>(`${new Date().toISOString().slice(0, 7)}-01`);
+  const [startDate, setStartDate] = useState<string>('2022-01-01');
   const [endDate, setEndDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const [reportData, setReportData] = useState<any>(null);
   const [loading, setLoading] = useState(false);
