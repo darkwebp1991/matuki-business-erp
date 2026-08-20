@@ -114,7 +114,8 @@ const server = http.createServer(async (req, res) => {
   }
 
   const parsedUrl = url.parse(req.url, true);
-  const pathname = parsedUrl.pathname;
+  const rawPath = parsedUrl.pathname || '/';
+  const pathname = rawPath.startsWith('/api') ? rawPath : `/api${rawPath === '/' ? '' : rawPath}`;
   const query = parsedUrl.query;
   const method = req.method;
 

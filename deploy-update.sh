@@ -39,7 +39,7 @@ npm install
 echo "⚡ Building frontend bundle..."
 npm run build
 
-# 6. Configure Nginx Reverse Proxy (Forward /api directly to Node backend on port 4321)
+# 6. Configure Nginx Reverse Proxy (Forward /api requests to Node backend port 4321)
 if command -v nginx > /dev/null 2>&1; then
     echo "⚙️ Configuring Nginx reverse proxy..."
     cat << 'EOF' | sudo tee /etc/nginx/sites-available/erp > /dev/null
@@ -51,10 +51,6 @@ server {
     root /var/www/erp/dist;
     index index.html;
 
-    location / {
-        try_files $uri $uri/ /index.html;
-    }
-
     location /api {
         proxy_pass http://127.0.0.1:4321;
         proxy_http_version 1.1;
@@ -62,6 +58,10 @@ server {
         proxy_set_header Connection 'upgrade';
         proxy_set_header Host $host;
         proxy_cache_bypass $http_upgrade;
+    }
+
+    location / {
+        try_files $uri $uri/ /index.html;
     }
 }
 EOF
