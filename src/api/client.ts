@@ -2,13 +2,7 @@ const getApiBaseUrl = () => {
   if (typeof window !== 'undefined' && window.location) {
     const protocol = window.location.protocol;
     const host = window.location.hostname || 'localhost';
-    const port = window.location.port;
-
-    // If served via Nginx or production, fallback to relative /api or direct 4321
-    if (port === '5173') {
-      return `${protocol}//${host}:4321/api`;
-    }
-    return '/api';
+    return `${protocol}//${host}:4321/api`;
   }
   return 'http://localhost:4321/api';
 };

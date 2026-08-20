@@ -8,12 +8,18 @@
 
 echo "🚀 Starting Matuki ERP 1-Click Auto Update..."
 
-# 1. Open UFW firewall ports so login and API requests are never blocked
+# 1. Unblock ports in UFW firewall & iptables
 if command -v ufw > /dev/null 2>&1; then
     sudo ufw allow 80/tcp || true
     sudo ufw allow 443/tcp || true
     sudo ufw allow 4321/tcp || true
     sudo ufw allow 5173/tcp || true
+fi
+
+if command -v iptables > /dev/null 2>&1; then
+    sudo iptables -I INPUT -p tcp --dport 4321 -j ACCEPT || true
+    sudo iptables -I INPUT -p tcp --dport 5173 -j ACCEPT || true
+    sudo iptables -I INPUT -p tcp --dport 80 -j ACCEPT || true
 fi
 
 # 2. Flush SQLite WAL to ensure 100% data safety
@@ -51,12 +57,14 @@ server {
     root /var/www/erp/dist;
     index index.html;
 
-    location /api {
-        proxy_pass http://127.0.0.1:4321;
+    location /api/ {
+        proxy_pass http://127.0.0.1:4321/api/;
         proxy_http_version 1.1;
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection 'upgrade';
         proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_cache_bypass $http_upgrade;
     }
 
