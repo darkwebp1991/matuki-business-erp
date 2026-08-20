@@ -1,7 +1,14 @@
 const getApiBaseUrl = () => {
   if (typeof window !== 'undefined' && window.location) {
+    const protocol = window.location.protocol;
     const host = window.location.hostname || 'localhost';
-    return `http://${host}:4321/api`;
+    const port = window.location.port;
+
+    // If served via Nginx or production, fallback to relative /api or direct 4321
+    if (port === '5173') {
+      return `${protocol}//${host}:4321/api`;
+    }
+    return '/api';
   }
   return 'http://localhost:4321/api';
 };
@@ -9,7 +16,7 @@ const getApiBaseUrl = () => {
 const BASE_URL = getApiBaseUrl();
 
 async function request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
-  const url = `${BASE_URL}${endpoint}`;
+  const url = endpoint.startsWith('http') ? endpoint : `${BASE_URL}${endpoint}`;
   const headers = {
     'Content-Type': 'application/json',
     ...(options.headers || {})
@@ -35,8 +42,8 @@ export const api = {
   // Real-Time Server-Sent Events (Instant Live Sync across PCs on LAN / WiFi)
   subscribeToEvents: (onEvent: (data: any) => void) => {
     try {
-      const host = (typeof window !== 'undefined' && window.location && window.location.hostname) ? window.location.hostname : 'localhost';
-      const eventSource = new EventSource(`http://${host}:4321/api/events`);
+      const sseUrl = `${BASE_URL}/events`;
+      const eventSource = new EventSource(sseUrl);
       eventSource.onmessage = (e) => {
         try {
           const data = JSON.parse(e.data);
