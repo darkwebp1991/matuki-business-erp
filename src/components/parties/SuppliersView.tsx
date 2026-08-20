@@ -696,9 +696,9 @@ export const SuppliersView: React.FC<SuppliersViewProps> = ({ initialSearch = ''
                         <td style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
                           {formatDate(p.date)}
                         </td>
-                        <td className="font-mono" style={{ fontWeight: 800 }}>
-                          {formatCurrency(p.grand_total)}
-                        </td>
+                        <td className="p-3 text-red-500 font-bold">
+                        ₹ {Number(selectedSupplier.opening_balance || selectedSupplier.current_balance || 0).toLocaleString('en-IN')}
+                      </td>
                         <td className="font-mono" style={{ color: 'var(--vyapar-green)' }}>
                           {formatCurrency(p.paid_amount)}
                         </td>
