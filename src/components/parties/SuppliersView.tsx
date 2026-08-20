@@ -378,38 +378,15 @@ export const SuppliersView: React.FC<SuppliersViewProps> = ({ initialSearch = ''
                         {s.mobile || 'No Mobile'}
                       </div>
                     </div>
-
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <div style={{ textAlign: 'right' }}>
-                        <div style={{
-                          fontWeight: 800,
-                          fontFamily: 'var(--font-mono)',
-                          fontSize: '0.82rem',
-                          color: s.current_balance > 0 ? 'var(--vyapar-red)' : 'var(--text-muted)'
-                        }}>
-                          {formatCurrency(Math.abs(s.current_balance))}
-                        </div>
-                        <span style={{
-                          fontSize: '0.65rem',
-                          fontWeight: 700,
-                          color: s.current_balance > 0 ? 'var(--vyapar-red)' : 'var(--text-muted)'
-                        }}>
-                          {s.current_balance > 0 ? 'To Pay' : 'Settled'}
-                        </span>
+                    <div style={{ textAlign: 'right' }}>
+                      <div style={{
+                        fontWeight: 800,
+                        fontFamily: 'var(--font-mono)',
+                        fontSize: '0.9rem',
+                        color: '#dc2626'
+                      }}>
+                        {Number(s.opening_balance || s.current_balance || 0).toLocaleString('en-IN')}
                       </div>
-
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleOpenEditSupplier(s);
-                        }}
-                        className="btn btn-secondary btn-sm"
-                        style={{ padding: '3px 6px', fontSize: '0.7rem', color: '#0284c7', background: '#f8fafc' }}
-                        title="Edit Supplier Profile"
-                      >
-                        <Edit3 size={12} />
-                      </button>
                     </div>
                   </div>
 

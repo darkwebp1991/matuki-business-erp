@@ -434,33 +434,15 @@ export const CustomersView: React.FC<CustomersViewProps> = ({ initialSearch = ''
                       {c.mobile || 'No mobile'}
                     </div>
                   </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <div style={{ textAlign: 'right' }}>
-                      <div style={{
-                        fontWeight: 800,
-                        fontFamily: 'var(--font-mono)',
-                        fontSize: '0.84rem',
-                        color: 'var(--vyapar-green)'
-                      }}>
-                        {formatCurrency(c.current_balance > 0 ? c.current_balance : 0)}
-                      </div>
-                      <span style={{ fontSize: '0.65rem', color: 'var(--vyapar-green)', fontWeight: 700 }}>
-                        {c.current_balance > 0 ? 'To Receive' : 'Settled'}
-                      </span>
+                  <div style={{ textAlign: 'right' }}>
+                    <div style={{
+                      fontWeight: 800,
+                      fontFamily: 'var(--font-mono)',
+                      fontSize: '0.9rem',
+                      color: '#059669'
+                    }}>
+                      {Number(c.opening_balance || c.current_balance || 0).toLocaleString('en-IN')}
                     </div>
-
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleOpenEditCustomer(c);
-                      }}
-                      className="btn btn-secondary btn-sm"
-                      style={{ padding: '3px 6px', fontSize: '0.7rem', color: '#1e40af', background: '#f8fafc' }}
-                      title="Edit Customer Profile"
-                    >
-                      <Edit3 size={12} />
-                    </button>
                   </div>
                 </div>
               );
