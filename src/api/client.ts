@@ -2,7 +2,13 @@ const getApiBaseUrl = () => {
   if (typeof window !== 'undefined' && window.location) {
     const protocol = window.location.protocol;
     const host = window.location.hostname || 'localhost';
-    return `${protocol}//${host}:4321/api`;
+    const port = window.location.port;
+
+    if (port === '5173') {
+      return `${protocol}//${host}:4321/api`;
+    }
+    // Standard Port 80 / Production: /api (100% Firewall Safe)
+    return '/api';
   }
   return 'http://localhost:4321/api';
 };
