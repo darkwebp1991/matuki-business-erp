@@ -20,6 +20,9 @@ uploads/
 .env
 .env.local
 
+# WhatsApp session data
+wa_session/
+
 # Logs
 *.log
 logs/
