@@ -20,6 +20,10 @@ uploads/
 .env
 .env.local
 
+# Temporary scratch files
+scratch/
+.tempmediaStorage/
+
 # WhatsApp session data
 wa_session/
 
