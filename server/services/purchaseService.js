@@ -298,5 +298,80 @@ export const purchaseService = {
 
       return this.getPurchaseById(purchaseId);
     });
+  },
+
+  // --- PURCHASE RETURNS / DEBIT NOTES (ડેબિટ નોટ) ---
+  getPurchaseReturns(filters = {}) {
+    const db = getDatabase();
+    let query = 'SELECT * FROM purchase_returns WHERE 1=1';
+    const params = [];
+    if (filters.supplier_id) {
+      query += ' AND supplier_id = ?';
+      params.push(filters.supplier_id);
+    }
+    if (filters.startDate && filters.endDate) {
+      query += ' AND date BETWEEN ? AND ?';
+      params.push(filters.startDate, filters.endDate);
+    }
+    query += ' ORDER BY date DESC, id DESC';
+    const returns = db.prepare(query).all(...params);
+
+    if (returns.length === 0) {
+      let ledgerQuery = `
+        SELECT
+          id,
+          voucher_no as return_no,
+          entry_date as date,
+          party_id as supplier_id,
+          party_name as supplier_name,
+          debit_amount as total_amount,
+          notes as reason
+        FROM ledger_entries
+        WHERE voucher_type IN ('PURCHASE_RETURN', 'DEBIT_NOTE')
+      `;
+      const lParams = [];
+      if (filters.supplier_id) {
+        ledgerQuery += ' AND party_id = ?';
+        lParams.push(filters.supplier_id);
+      }
+      ledgerQuery += ' ORDER BY entry_date DESC, id DESC';
+      return db.prepare(ledgerQuery).all(...lParams);
+    }
+    return returns;
+  },
+
+  createPurchaseReturn(data, username = 'Admin') {
+    return runInTransaction((db) => {
+      const returnNo = data.return_no || settingsService.getNextDocumentNumber('DEBIT_NOTE');
+      const date = data.date || new Date().toISOString().split('T')[0];
+      const purchaseId = data.purchase_id || null;
+      const supplierId = data.supplier_id;
+      const supplierName = data.supplier_name || 'Supplier';
+      const totalAmount = Number(data.total_amount || data.grand_total || 0.0);
+      const reason = data.reason || data.notes || 'Purchase Return / Debit Note';
+
+      const res = db.prepare(`
+        INSERT INTO purchase_returns (return_no, date, purchase_id, supplier_id, supplier_name, total_amount, reason, created_by)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(returnNo, date, purchaseId, supplierId, supplierName, totalAmount, reason, username);
+
+      const returnId = res.lastInsertRowid;
+
+      // Debit Supplier (reduces supplier payable balance)
+      db.prepare(`
+        INSERT INTO ledger_entries (
+          entry_date, party_type, party_id, party_name, voucher_type, voucher_id, voucher_no,
+          debit_amount, credit_amount, notes
+        ) VALUES (?, 'SUPPLIER', ?, ?, 'PURCHASE_RETURN', ?, ?, ?, 0.0, ?)
+      `).run(date, supplierId, supplierName, returnId, returnNo, totalAmount, `Debit Note / Return #${returnNo}: ${reason}`);
+
+      // Audit log
+      db.prepare(`
+        INSERT INTO audit_logs (username, action, module, record_id, notes)
+        VALUES (?, 'CREATE', 'PURCHASE_RETURNS', ?, ?)
+      `).run(username, String(returnId), `Created Purchase Return / Debit Note ${returnNo} for ${supplierName} (₹${totalAmount})`);
+
+      return { id: returnId, return_no: returnNo, total_amount: totalAmount };
+    });
   }
 };

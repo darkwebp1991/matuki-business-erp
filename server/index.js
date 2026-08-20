@@ -40,6 +40,23 @@ try {
   initDatabase();
   // Auto-seed if first run
   seedSweetsData(false);
+
+  // Auto-heal / self-sync ledger entries if sales exist but ledger is missing
+  try {
+    const dbCheck = getDatabase();
+    const salesCnt = dbCheck.prepare('SELECT COUNT(*) as c FROM sales').get()?.c || 0;
+    const ledgerCnt = dbCheck.prepare("SELECT COUNT(*) as c FROM ledger_entries WHERE party_type = 'CUSTOMER' AND voucher_type = 'SALE'").get()?.c || 0;
+    if (salesCnt > 0 && ledgerCnt < salesCnt) {
+      console.log(`[AUTO-HEAL] Syncing ${salesCnt} sales to ledger_entries...`);
+      dbCheck.exec(`
+        INSERT OR IGNORE INTO ledger_entries (entry_date, party_type, party_id, party_name, voucher_type, voucher_id, voucher_no, debit_amount, credit_amount, notes)
+        SELECT s.date, 'CUSTOMER', s.customer_id, COALESCE(s.customer_name, 'Walk-in Customer'), 'SALE', s.id, s.invoice_no, s.grand_total, 0.0, 'Bill #' || s.invoice_no
+        FROM sales s WHERE s.status = 'ACTIVE' AND s.customer_id IS NOT NULL;
+      `);
+    }
+  } catch (e) {
+    console.warn('Ledger auto-heal note:', e.message);
+  }
   // Re-arm pending 5-minute auto WhatsApp invoice dispatches
   autoInvoiceDispatchService.initDispatcher();
   // Start daily 8:45 PM auto daybook snapshot scheduler
@@ -725,15 +742,41 @@ const server = http.createServer(async (req, res) => {
       return sendJson(res, 200, { success: true, data: supplier });
     }
 
-    // --- LEDGER & PAYMENTS ---
+    // --- LEDGER & PAYMENTS (ચુકવણી, જમા અને ઉધાર વ્યવહારો) ---
     if (pathname === '/api/ledger/statement' && method === 'GET') {
       const stmt = partyService.getPartyLedgerStatement(query.party_type, query.party_id, query.startDate, query.endDate);
       return sendJson(res, 200, { success: true, data: stmt });
+    }
+    if (pathname === '/api/payments' && method === 'GET') {
+      const payments = partyService.getPayments(query);
+      return sendJson(res, 200, { success: true, data: payments });
     }
     if (pathname === '/api/payments' && method === 'POST') {
       const body = await parseBody(req);
       const pay = partyService.recordPaymentReceipt(body, body.username || 'Cashier');
       return sendJson(res, 201, { success: true, data: pay });
+    }
+
+    // --- SALES RETURNS & CREDIT NOTES (સેલ્સ રિટર્ન અને ક્રેડિટ નોટ) ---
+    if ((pathname === '/api/sales-returns' || pathname === '/api/credit-notes') && method === 'GET') {
+      const returns = salesService.getSalesReturns(query);
+      return sendJson(res, 200, { success: true, data: returns });
+    }
+    if ((pathname === '/api/sales-returns' || pathname === '/api/credit-notes') && method === 'POST') {
+      const body = await parseBody(req);
+      const ret = salesService.createSalesReturn(body, body.username || 'Cashier');
+      return sendJson(res, 201, { success: true, data: ret });
+    }
+
+    // --- PURCHASE RETURNS & DEBIT NOTES (પર્ચેઝ રિટર્ન અને ડેબિટ નોટ) ---
+    if ((pathname === '/api/purchase-returns' || pathname === '/api/debit-notes') && method === 'GET') {
+      const returns = purchaseService.getPurchaseReturns(query);
+      return sendJson(res, 200, { success: true, data: returns });
+    }
+    if ((pathname === '/api/purchase-returns' || pathname === '/api/debit-notes') && method === 'POST') {
+      const body = await parseBody(req);
+      const ret = purchaseService.createPurchaseReturn(body, body.username || 'Admin');
+      return sendJson(res, 201, { success: true, data: ret });
     }
 
     // --- EXPENSES ---

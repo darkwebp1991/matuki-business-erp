@@ -9,7 +9,7 @@ let baileysModule = null;
 async function getBaileys() {
   if (!baileysModule) {
     const mod = await import('@whiskeysockets/baileys');
-    baileysModule = mod.default || mod;
+    baileysModule = mod;
   }
   return baileysModule;
 }
@@ -88,13 +88,11 @@ class WhatsAppGatewayService {
 
       const baileys = await getBaileys();
       const makeWASocket = baileys.default || baileys.makeWASocket;
-      const {
-        useMultiFileAuthState,
-        makeCacheableSignalKeyStore,
-        fetchLatestBaileysVersion,
-        DisconnectReason,
-        Browsers
-      } = baileys;
+      const useMultiFileAuthState = baileys.useMultiFileAuthState;
+      const makeCacheableSignalKeyStore = baileys.makeCacheableSignalKeyStore;
+      const fetchLatestBaileysVersion = baileys.fetchLatestBaileysVersion;
+      const DisconnectReason = baileys.DisconnectReason;
+      const Browsers = baileys.Browsers;
 
       // Fetch the exact current WA Web version
       let version = [2, 3000, 1043857760];

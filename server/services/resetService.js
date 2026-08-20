@@ -118,51 +118,62 @@ export const resetService = {
       console.warn('Pre-reset backup warning:', e.message);
     }
 
-    return runInTransaction((db) => {
-      db.exec(`
-        DELETE FROM vasan_ledger;
-        DELETE FROM sale_items;
-        DELETE FROM sales_returns;
-        DELETE FROM sales;
-        DELETE FROM purchase_items;
-        DELETE FROM purchase_returns;
-        DELETE FROM purchases;
-        DELETE FROM payments;
-        DELETE FROM expenses;
-        DELETE FROM ledger_entries;
-        DELETE FROM manufacturing_wastage;
-        DELETE FROM manufacturing_items;
-        DELETE FROM manufacturing_orders;
-        DELETE FROM stock_adjustments;
-        DELETE FROM stock_movements;
-        DELETE FROM recipe_items;
-        DELETE FROM recipe_versions;
-        DELETE FROM recipes;
-        DELETE FROM raw_material_price_history;
-        DELETE FROM raw_materials;
-        DELETE FROM products;
-        DELETE FROM customers;
-        DELETE FROM suppliers;
-      `);
+    const db = getDatabase();
+    db.exec('PRAGMA foreign_keys = OFF;');
+    try {
+      return runInTransaction((db) => {
+        db.exec(`
+          DELETE FROM vasan_ledger;
+          DELETE FROM sale_items;
+          DELETE FROM sales_return_items;
+          DELETE FROM sales_returns;
+          DELETE FROM sales;
+          DELETE FROM purchase_items;
+          DELETE FROM purchase_return_items;
+          DELETE FROM purchase_returns;
+          DELETE FROM purchases;
+          DELETE FROM payments;
+          DELETE FROM expenses;
+          DELETE FROM ledger_entries;
+          DELETE FROM advance_order_items;
+          DELETE FROM advance_orders;
+          DELETE FROM whatsapp_inbound_orders;
+          DELETE FROM manufacturing_wastage;
+          DELETE FROM manufacturing_items;
+          DELETE FROM manufacturing_orders;
+          DELETE FROM stock_adjustments;
+          DELETE FROM stock_movements;
+          DELETE FROM recipe_items;
+          DELETE FROM recipe_versions;
+          DELETE FROM recipes;
+          DELETE FROM raw_material_price_history;
+          DELETE FROM raw_materials;
+          DELETE FROM products;
+          DELETE FROM customers;
+          DELETE FROM suppliers;
+        `);
 
-      // Reset auto-increment sequence counters
-      try {
-        db.exec('DELETE FROM sqlite_sequence;');
-      } catch (e) {}
+        // Reset auto-increment sequence counters
+        try {
+          db.exec('DELETE FROM sqlite_sequence;');
+        } catch (e) {}
 
-      // Audit Log
-      db.prepare(`
-        INSERT INTO audit_logs (username, action, module, record_id, notes)
-        VALUES (?, 'FACTORY_RESET', 'SYSTEM', 'ALL', 'Executed complete factory clean reset.')
-      `).run(username);
+        // Audit Log
+        db.prepare(`
+          INSERT INTO audit_logs (username, action, module, record_id, notes)
+          VALUES (?, 'FACTORY_RESET', 'SYSTEM', 'ALL', 'Executed complete factory clean reset.')
+        `).run(username);
 
-      return {
-        success: true,
-        mode: 'FACTORY_RESET_COMPLETE',
-        message: 'Factory Reset complete. All trial data, products, parties, and vouchers have been cleared.',
-        backup_file: backupResult?.filename || null
-      };
-    });
+        return {
+          success: true,
+          mode: 'FACTORY_RESET_COMPLETE',
+          message: 'Factory Reset complete. All trial data, products, parties, and vouchers have been cleared.',
+          backup_file: backupResult?.filename || null
+        };
+      });
+    } finally {
+      db.exec('PRAGMA foreign_keys = ON;');
+    }
   },
 
   // Option 3: Reload Sample Demo Sweets Dataset

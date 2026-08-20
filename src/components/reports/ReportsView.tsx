@@ -958,19 +958,22 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ settings: propSettings
                                 typeLabel = 'SALE';
                               } else if (e.voucher_type === 'PAYMENT_RECEIVED' || e.voucher_type === 'PAYMENT_IN') {
                                 typeBadge = 'badge-green';
-                                typeLabel = 'RECEIPT';
-                              } else if (e.voucher_type === 'SALES_RETURN') {
+                                typeLabel = 'PAYMENT IN';
+                              } else if (e.voucher_type === 'PAYMENT_MADE' || e.voucher_type === 'PAYMENT_OUT') {
                                 typeBadge = 'badge-amber';
-                                typeLabel = 'RETURN';
+                                typeLabel = 'PAYMENT OUT';
+                              } else if (e.voucher_type === 'SALES_RETURN' || e.voucher_type === 'CREDIT_NOTE') {
+                                typeBadge = 'badge-purple';
+                                typeLabel = 'CREDIT NOTE';
+                              } else if (e.voucher_type === 'PURCHASE_RETURN' || e.voucher_type === 'DEBIT_NOTE') {
+                                typeBadge = 'badge-purple';
+                                typeLabel = 'DEBIT NOTE';
                               } else if (e.voucher_type === 'VASAN_CHARGE') {
                                 typeBadge = 'badge-red';
                                 typeLabel = 'VASAN PENALTY';
                               } else if (e.voucher_type === 'PURCHASE') {
                                 typeBadge = 'badge-blue';
                                 typeLabel = 'PURCHASE';
-                              } else if (e.voucher_type === 'PAYMENT_OUT') {
-                                typeBadge = 'badge-amber';
-                                typeLabel = 'PAYMENT';
                               }
 
                               return (

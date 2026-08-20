@@ -3,6 +3,12 @@ import { getDatabase, runInTransaction } from './connection.js';
 export function seedSweetsData(force = false) {
   const db = getDatabase();
 
+  const salesCount = db.prepare('SELECT COUNT(*) as count FROM sales').get()?.count || 0;
+  if (salesCount > 10 && force && !process.env.ALLOW_LIVE_RESET) {
+    console.warn(`[SAFETY GUARD] Force seeding blocked: Database contains ${salesCount} live sales bills.`);
+    return { success: false, message: `Seeding blocked: Database contains ${salesCount} live sales. Set ALLOW_LIVE_RESET=true to override.` };
+  }
+
   const rawCount = db.prepare('SELECT COUNT(*) as count FROM raw_materials').get();
   if (rawCount.count > 0 && !force) {
     console.log('Database already seeded. Skipping.');
@@ -13,37 +19,65 @@ export function seedSweetsData(force = false) {
     console.log('Seeding rich Sweets ERP demonstration dataset...');
 
     if (force) {
-      db.exec('DELETE FROM ledger_entries;');
-      db.exec('DELETE FROM stock_movements;');
-      db.exec('DELETE FROM stock_adjustments;');
-      db.exec('DELETE FROM manufacturing_wastage;');
-      db.exec('DELETE FROM manufacturing_items;');
-      db.exec('DELETE FROM manufacturing_orders;');
-      db.exec('DELETE FROM vasan_ledger;');
-      db.exec('DELETE FROM sale_items;');
-      db.exec('DELETE FROM sales_returns;');
-      db.exec('DELETE FROM sales;');
-      db.exec('DELETE FROM purchase_items;');
-      db.exec('DELETE FROM purchase_returns;');
-      db.exec('DELETE FROM purchases;');
-      db.exec('DELETE FROM payments;');
-      db.exec('DELETE FROM expenses;');
-      db.exec('DELETE FROM recipe_items;');
-      db.exec('DELETE FROM recipe_versions;');
-      db.exec('DELETE FROM recipes;');
-      db.exec('DELETE FROM raw_material_price_history;');
-      db.exec('DELETE FROM products;');
-      db.exec('DELETE FROM raw_materials;');
-      db.exec('DELETE FROM customers;');
-      db.exec('DELETE FROM suppliers;');
+      db.exec('PRAGMA foreign_keys = OFF;');
+      try {
+        db.exec('DELETE FROM ledger_entries;');
+        db.exec('DELETE FROM stock_movements;');
+        db.exec('DELETE FROM stock_adjustments;');
+        db.exec('DELETE FROM manufacturing_wastage;');
+        db.exec('DELETE FROM manufacturing_items;');
+        db.exec('DELETE FROM manufacturing_orders;');
+        db.exec('DELETE FROM vasan_ledger;');
+        db.exec('DELETE FROM sale_items;');
+        db.exec('DELETE FROM sales_return_items;');
+        db.exec('DELETE FROM sales_returns;');
+        db.exec('DELETE FROM sales;');
+        db.exec('DELETE FROM purchase_items;');
+        db.exec('DELETE FROM purchase_return_items;');
+        db.exec('DELETE FROM purchase_returns;');
+        db.exec('DELETE FROM purchases;');
+        db.exec('DELETE FROM payments;');
+        db.exec('DELETE FROM expenses;');
+        db.exec('DELETE FROM advance_order_items;');
+        db.exec('DELETE FROM advance_orders;');
+        db.exec('DELETE FROM whatsapp_inbound_orders;');
+        db.exec('DELETE FROM recipe_items;');
+        db.exec('DELETE FROM recipe_versions;');
+        db.exec('DELETE FROM recipes;');
+        db.exec('DELETE FROM raw_material_price_history;');
+        db.exec('DELETE FROM products;');
+        db.exec('DELETE FROM raw_materials;');
+        db.exec('DELETE FROM customers;');
+        db.exec('DELETE FROM suppliers;');
+      } finally {
+        db.exec('PRAGMA foreign_keys = ON;');
+      }
     }
 
-    // 1. Categories lookup
-    const catRows = db.prepare('SELECT id, name, type FROM categories').all();
+    // 1. Categories lookup (with auto-seeding default categories if missing)
+    let catRows = db.prepare('SELECT id, name, type FROM categories').all();
+    if (catRows.length === 0) {
+      const insertCat = db.prepare('INSERT INTO categories (name, type, description) VALUES (?, ?, ?)');
+      insertCat.run('Kaju Sweets (કાજુ મીઠાઈ)', 'FINISHED_PRODUCT', 'Premium Cashew based traditional sweets');
+      insertCat.run('Mawa / Khoya Sweets (માવા મીઠાઈ)', 'FINISHED_PRODUCT', 'Rich reduced milk sweets (Peda, Barfi)');
+      insertCat.run('Bengali Sweets (બંગાળી મીઠાઈ)', 'FINISHED_PRODUCT', 'Chhena based syrups & sweets (Rasgulla, Rasmalai)');
+      insertCat.run('Desi Ghee Snacks & Namkeen (નમકીન)', 'FINISHED_PRODUCT', 'Savory snacks, Farsan, Mathri');
+      insertCat.run('Nuts & Dry Fruits', 'RAW_MATERIAL', 'Cashew W320/Kaju Tukda, Almonds, Pistachio');
+      insertCat.run('Dairy & Fats', 'RAW_MATERIAL', 'Pure Desi Ghee, Fresh Full Cream Buffalo Milk, Mawa');
+      insertCat.run('Sweeteners & Spices', 'RAW_MATERIAL', 'Refined Sugar, Green Cardamom (Elaichi), Pure Saffron (Kesar)');
+      insertCat.run('Packaging Boxes & Foil', 'PACKAGING', 'Sweet Boxes (250g, 500g, 1kg), Silver Vark (Foil), Carry Bags');
+      insertCat.run('Semi-Finished Bases', 'SEMI_FINISHED', 'Fresh In-house Mawa, Kaju Paste, Sugar Syrup (Chashni)');
+      insertCat.run('Factory Overheads', 'EXPENSE', 'LPG Commercial Cylinders, Karigar Daily Wages, Electricity, Shop Rent');
+      catRows = db.prepare('SELECT id, name, type FROM categories').all();
+    }
+
     const catMap = {};
     for (const c of catRows) {
       catMap[c.type] = c.id;
+      catMap[c.name] = c.id;
     }
+    const defaultCatId = catRows[0]?.id || 1;
+    const getCatId = (key) => catMap[key] || catMap['RAW_MATERIAL'] || catMap['FINISHED_PRODUCT'] || defaultCatId;
 
     // 2. Suppliers
     const insertSupplier = db.prepare(`
@@ -63,16 +97,16 @@ export function seedSweetsData(force = false) {
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
-    const rmCashew = insertRM.run('RM-KJU', 'Cashew W320 Whole (કાજુ)', catMap['RAW_MATERIAL'], 'KG', 800.0, 800.0, 800.0, 780.0, 25.0, 100.0, 100.0, sup1, 5.0, '08013210').lastInsertRowid;
-    const rmSugar = insertRM.run('RM-SGR', 'Refined M-30 Sugar (ખાંડ)', catMap['RAW_MATERIAL'], 'KG', 45.0, 45.0, 45.0, 44.0, 50.0, 500.0, 500.0, sup1, 5.0, '17019990').lastInsertRowid;
-    const rmGhee = insertRM.run('RM-GHEE', 'Pure Desi Cow Ghee (શુદ્ધ ઘી)', catMap['RAW_MATERIAL'], 'KG', 620.0, 620.0, 620.0, 600.0, 20.0, 80.0, 80.0, sup2, 5.0, '04059020').lastInsertRowid;
-    const rmMilk = insertRM.run('RM-MILK', 'Fresh Full Cream Milk 6% Fat (દૂધ)', catMap['RAW_MATERIAL'], 'LTR', 65.0, 65.0, 65.0, 62.0, 40.0, 150.0, 150.0, sup2, 0.0, '04012000').lastInsertRowid;
-    const rmMawa = insertRM.run('RM-MAWA', 'Fresh Khoya / Mawa (માવો)', catMap['RAW_MATERIAL'], 'KG', 340.0, 340.0, 340.0, 330.0, 15.0, 60.0, 60.0, sup2, 5.0, '04052000').lastInsertRowid;
-    const rmPista = insertRM.run('RM-PISTA', 'Iranian Pistachio Slices (પિસ્તા)', catMap['RAW_MATERIAL'], 'KG', 1450.0, 1450.0, 1450.0, 1400.0, 5.0, 15.0, 15.0, sup1, 5.0, '08025100').lastInsertRowid;
-    const rmElaichi = insertRM.run('RM-ELC', 'Green Cardamom Bold 8mm (એલચી)', catMap['RAW_MATERIAL'], 'KG', 2800.0, 2800.0, 2800.0, 2700.0, 2.0, 8.0, 8.0, sup1, 5.0, '09083100').lastInsertRowid;
-    const rmKesar = insertRM.run('RM-KSR', 'Kashmiri Mogra Saffron (કેસર)', catMap['RAW_MATERIAL'], 'GM', 240.0, 240.0, 240.0, 230.0, 10.0, 50.0, 50.0, sup1, 5.0, '09102010').lastInsertRowid;
-    const rmSilver = insertRM.run('RM-VRK', 'Pure Silver Vark (ચાંદી વરખ)', catMap['PACKAGING'], 'PCS', 3.0, 3.0, 3.0, 2.8, 100.0, 1000.0, 1000.0, sup3, 5.0, '71069290').lastInsertRowid;
-    const rmBox1kg = insertRM.run('RM-BX1K', 'Matuki Royal Sweet Box 1 KG', catMap['PACKAGING'], 'PCS', 22.0, 22.0, 22.0, 20.0, 100.0, 500.0, 500.0, sup3, 12.0, '48191000').lastInsertRowid;
+    const rmCashew = insertRM.run('RM-KJU', 'Cashew W320 Whole (કાજુ)', getCatId('RAW_MATERIAL'), 'KG', 800.0, 800.0, 800.0, 780.0, 25.0, 100.0, 100.0, sup1, 5.0, '08013210').lastInsertRowid;
+    const rmSugar = insertRM.run('RM-SGR', 'Refined M-30 Sugar (ખાંડ)', getCatId('RAW_MATERIAL'), 'KG', 45.0, 45.0, 45.0, 44.0, 50.0, 500.0, 500.0, sup1, 5.0, '17019990').lastInsertRowid;
+    const rmGhee = insertRM.run('RM-GHEE', 'Pure Desi Cow Ghee (શુદ્ધ ઘી)', getCatId('RAW_MATERIAL'), 'KG', 620.0, 620.0, 620.0, 600.0, 20.0, 80.0, 80.0, sup2, 5.0, '04059020').lastInsertRowid;
+    const rmMilk = insertRM.run('RM-MILK', 'Fresh Full Cream Milk 6% Fat (દૂધ)', getCatId('RAW_MATERIAL'), 'LTR', 65.0, 65.0, 65.0, 62.0, 40.0, 150.0, 150.0, sup2, 0.0, '04012000').lastInsertRowid;
+    const rmMawa = insertRM.run('RM-MAWA', 'Fresh Khoya / Mawa (માવો)', getCatId('RAW_MATERIAL'), 'KG', 340.0, 340.0, 340.0, 330.0, 15.0, 60.0, 60.0, sup2, 5.0, '04052000').lastInsertRowid;
+    const rmPista = insertRM.run('RM-PISTA', 'Iranian Pistachio Slices (પિસ્તા)', getCatId('RAW_MATERIAL'), 'KG', 1450.0, 1450.0, 1450.0, 1400.0, 5.0, 15.0, 15.0, sup1, 5.0, '08025100').lastInsertRowid;
+    const rmElaichi = insertRM.run('RM-ELC', 'Green Cardamom Bold 8mm (એલચી)', getCatId('RAW_MATERIAL'), 'KG', 2800.0, 2800.0, 2800.0, 2700.0, 2.0, 8.0, 8.0, sup1, 5.0, '09083100').lastInsertRowid;
+    const rmKesar = insertRM.run('RM-KSR', 'Kashmiri Mogra Saffron (કેસર)', getCatId('RAW_MATERIAL'), 'GM', 240.0, 240.0, 240.0, 230.0, 10.0, 50.0, 50.0, sup1, 5.0, '09102010').lastInsertRowid;
+    const rmSilver = insertRM.run('RM-VRK', 'Pure Silver Vark (ચાંદી વરખ)', getCatId('PACKAGING'), 'PCS', 3.0, 3.0, 3.0, 2.8, 100.0, 1000.0, 1000.0, sup3, 5.0, '71069290').lastInsertRowid;
+    const rmBox1kg = insertRM.run('RM-BX1K', 'Matuki Royal Sweet Box 1 KG', getCatId('PACKAGING'), 'PCS', 22.0, 22.0, 22.0, 20.0, 100.0, 500.0, 500.0, sup3, 12.0, '48191000').lastInsertRowid;
 
     // Record Opening Stock Movements for Raw Materials
     const insertMovement = db.prepare(`
@@ -103,13 +137,13 @@ export function seedSweetsData(force = false) {
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
-    const pKajuKatli = insertProd.run('PRD-KK', '890100100001', 'Kaju Katli Diamond Special (કાજુ કતરી)', catMap['FINISHED_PRODUCT'], 'Kaju Sweets', 'FINISHED_PRODUCT', 'KG', 760.0, 980.0, 890.0, 10.0, 150.0, 5.0, '21069099', 25.0, 760.0, 25.0).lastInsertRowid;
-    const pKesarPeda = insertProd.run('PRD-KP', '890100100002', 'Shreeji Kesar Peda (કેસર પેંડા)', catMap['FINISHED_PRODUCT'], 'Mawa Sweets', 'FINISHED_PRODUCT', 'KG', 480.0, 680.0, 610.0, 8.0, 100.0, 5.0, '21069099', 20.0, 480.0, 20.0).lastInsertRowid;
-    const pMotichoor = insertProd.run('PRD-ML', '890100100003', 'Desi Ghee Motichoor Ladoo (મોતીચૂર લાડુ)', catMap['FINISHED_PRODUCT'], 'Ghee Sweets', 'FINISHED_PRODUCT', 'KG', 360.0, 540.0, 480.0, 12.0, 120.0, 5.0, '21069099', 30.0, 360.0, 30.0).lastInsertRowid;
-    const pGulabJamun = insertProd.run('PRD-GJ', '890100100004', 'Angoori Gulab Jamun (ગુલાબ જાંબુ)', catMap['FINISHED_PRODUCT'], 'Mawa Sweets', 'FINISHED_PRODUCT', 'KG', 320.0, 480.0, 420.0, 15.0, 100.0, 5.0, '21069099', 18.0, 320.0, 18.0).lastInsertRowid;
+    const pKajuKatli = insertProd.run('PRD-KK', '890100100001', 'Kaju Katli Diamond Special (કાજુ કતરી)', getCatId('FINISHED_PRODUCT'), 'Kaju Sweets', 'FINISHED_PRODUCT', 'KG', 760.0, 980.0, 890.0, 10.0, 150.0, 5.0, '21069099', 25.0, 760.0, 25.0).lastInsertRowid;
+    const pKesarPeda = insertProd.run('PRD-KP', '890100100002', 'Shreeji Kesar Peda (કેસર પેંડા)', getCatId('FINISHED_PRODUCT'), 'Mawa Sweets', 'FINISHED_PRODUCT', 'KG', 480.0, 680.0, 610.0, 8.0, 100.0, 5.0, '21069099', 20.0, 480.0, 20.0).lastInsertRowid;
+    const pMotichoor = insertProd.run('PRD-ML', '890100100003', 'Desi Ghee Motichoor Ladoo (મોતીચૂર લાડુ)', getCatId('FINISHED_PRODUCT'), 'Ghee Sweets', 'FINISHED_PRODUCT', 'KG', 360.0, 540.0, 480.0, 12.0, 120.0, 5.0, '21069099', 30.0, 360.0, 30.0).lastInsertRowid;
+    const pGulabJamun = insertProd.run('PRD-GJ', '890100100004', 'Angoori Gulab Jamun (ગુલાબ જાંબુ)', getCatId('FINISHED_PRODUCT'), 'Mawa Sweets', 'FINISHED_PRODUCT', 'KG', 320.0, 480.0, 420.0, 15.0, 100.0, 5.0, '21069099', 18.0, 320.0, 18.0).lastInsertRowid;
 
     // Semi-Finished Product: Kaju Paste
-    const pKajuPaste = insertProd.run('SFP-KJP', '890100100005', 'Prepared Fine Kaju Paste (કાજુ પેસ્ટ)', catMap['SEMI_FINISHED'], 'Semi-Finished', 'SEMI_FINISHED_PRODUCT', 'KG', 720.0, 820.0, 800.0, 5.0, 50.0, 5.0, '21069099', 10.0, 720.0, 10.0).lastInsertRowid;
+    const pKajuPaste = insertProd.run('SFP-KJP', '890100100005', 'Prepared Fine Kaju Paste (કાજુ પેસ્ટ)', getCatId('SEMI_FINISHED'), 'Semi-Finished', 'SEMI_FINISHED_PRODUCT', 'KG', 720.0, 820.0, 800.0, 5.0, 50.0, 5.0, '21069099', 10.0, 720.0, 10.0).lastInsertRowid;
 
     insertMovement.run('FINISHED_PRODUCT', pKajuKatli, 'Kaju Katli Diamond Special', 25.0, 'KG', 25.0, 760.0, 19000.0);
     insertMovement.run('FINISHED_PRODUCT', pKesarPeda, 'Shreeji Kesar Peda', 20.0, 'KG', 20.0, 480.0, 9600.0);

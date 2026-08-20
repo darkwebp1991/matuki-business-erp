@@ -210,11 +210,12 @@ export const generateAndDownloadPartyStatementPDF = (
 
     let typeStr = e.voucher_type;
     if (e.voucher_type === 'SALE') typeStr = 'SALE INVOICE';
-    else if (e.voucher_type === 'PAYMENT_RECEIVED' || e.voucher_type === 'PAYMENT_IN') typeStr = 'RECEIPT (JAMAA)';
-    else if (e.voucher_type === 'SALES_RETURN') typeStr = 'SALES RETURN';
+    else if (e.voucher_type === 'PAYMENT_RECEIVED' || e.voucher_type === 'PAYMENT_IN') typeStr = 'PAYMENT IN (JAMAA)';
+    else if (e.voucher_type === 'PAYMENT_MADE' || e.voucher_type === 'PAYMENT_OUT') typeStr = 'PAYMENT OUT (UDHAR)';
+    else if (e.voucher_type === 'SALES_RETURN' || e.voucher_type === 'CREDIT_NOTE') typeStr = 'CREDIT NOTE (SALE RETURN)';
+    else if (e.voucher_type === 'PURCHASE_RETURN' || e.voucher_type === 'DEBIT_NOTE') typeStr = 'DEBIT NOTE (PURCHASE RETURN)';
     else if (e.voucher_type === 'VASAN_CHARGE') typeStr = 'VASAN PENALTY';
     else if (e.voucher_type === 'PURCHASE') typeStr = 'PURCHASE BILL';
-    else if (e.voucher_type === 'PAYMENT_OUT') typeStr = 'PAYMENT OUT';
 
     tableRows.push([
       idx + 1,

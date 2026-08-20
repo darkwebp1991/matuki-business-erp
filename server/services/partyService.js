@@ -569,13 +569,15 @@ export const partyService = {
   // --- LEDGER STATEMENTS & RUNNING BALANCES ---
   getPartyLedgerStatement(partyType, partyId, startDate = null, endDate = null) {
     const db = getDatabase();
+    const pId = Number(partyId);
+    if (isNaN(pId)) throw new Error(`Invalid ${partyType} ID provided`);
     
     // 1. Fetch Party details
     let party = null;
     if (partyType === 'CUSTOMER') {
-      party = db.prepare('SELECT id, customer_no as code, name, mobile, address, gstin, opening_balance, credit_limit FROM customers WHERE id = ?').get(partyId);
+      party = db.prepare('SELECT id, customer_no as code, name, mobile, address, gstin, opening_balance, credit_limit FROM customers WHERE id = ?').get(pId);
     } else {
-      party = db.prepare('SELECT id, supplier_no as code, name, mobile, address, gstin, opening_balance, credit_terms FROM suppliers WHERE id = ?').get(partyId);
+      party = db.prepare('SELECT id, supplier_no as code, name, mobile, address, gstin, opening_balance, credit_terms FROM suppliers WHERE id = ?').get(pId);
     }
 
     if (!party) throw new Error(`${partyType} ID ${partyId} not found`);
@@ -589,7 +591,7 @@ export const partyService = {
           COALESCE(SUM(credit_amount), 0) as total_credit
         FROM ledger_entries
         WHERE party_type = ? AND party_id = ? AND entry_date < ?
-      `).get(partyType, partyId, startDate);
+      `).get(partyType, pId, startDate);
 
       if (partyType === 'CUSTOMER') {
         openingBalance = Number(prevEntries.total_debit) - Number(prevEntries.total_credit);
@@ -603,7 +605,7 @@ export const partyService = {
       SELECT * FROM ledger_entries
       WHERE party_type = ? AND party_id = ?
     `;
-    const params = [partyType, partyId];
+    const params = [partyType, pId];
 
     if (startDate && endDate) {
       query += ' AND entry_date BETWEEN ? AND ?';
@@ -654,6 +656,85 @@ export const partyService = {
   },
 
   // --- PAYMENTS & RECEIPTS ---
+  getPayments(filters = {}) {
+    const db = getDatabase();
+    let query = `
+      SELECT p.*,
+        CASE
+          WHEN p.party_type = 'CUSTOMER' THEN 'PAYMENT_IN'
+          ELSE 'PAYMENT_OUT'
+        END as type_code
+      FROM payments p
+      WHERE 1=1
+    `;
+    const params = [];
+
+    if (filters.party_type) {
+      query += ' AND p.party_type = ?';
+      params.push(filters.party_type);
+    }
+    if (filters.party_id) {
+      query += ' AND p.party_id = ?';
+      params.push(filters.party_id);
+    }
+    if (filters.type) {
+      if (filters.type === 'PAYMENT_IN' || filters.type === 'PAYMENT_RECEIVED') {
+        query += " AND p.party_type = 'CUSTOMER'";
+      } else if (filters.type === 'PAYMENT_OUT' || filters.type === 'PAYMENT_MADE') {
+        query += " AND p.party_type = 'SUPPLIER'";
+      }
+    }
+    if (filters.startDate && filters.endDate) {
+      query += ' AND date(p.payment_date) BETWEEN ? AND ?';
+      params.push(filters.startDate, filters.endDate);
+    }
+    if (filters.search) {
+      query += ' AND (p.payment_no LIKE ? OR p.party_name LIKE ? OR p.notes LIKE ? OR p.reference_no LIKE ?)';
+      const s = `%${filters.search}%`;
+      params.push(s, s, s, s);
+    }
+
+    query += ' ORDER BY p.payment_date DESC, p.id DESC';
+    const paymentsList = db.prepare(query).all(...params);
+
+    if (paymentsList.length === 0) {
+      let ledgerQuery = `
+        SELECT
+          l.id,
+          l.voucher_no as payment_no,
+          l.entry_date as payment_date,
+          l.party_type,
+          l.party_id,
+          l.party_name,
+          CASE WHEN l.party_type = 'CUSTOMER' THEN l.credit_amount ELSE l.debit_amount END as amount,
+          CASE WHEN l.party_type = 'CUSTOMER' THEN 'PAYMENT_IN' ELSE 'PAYMENT_OUT' END as type_code,
+          'CASH/BANK' as payment_mode,
+          l.notes,
+          'Cashier' as created_by
+        FROM ledger_entries l
+        WHERE l.voucher_type IN ('PAYMENT_RECEIVED', 'PAYMENT_MADE', 'PAYMENT_IN', 'PAYMENT_OUT')
+          AND l.party_type IN ('CUSTOMER', 'SUPPLIER')
+      `;
+      const ledgerParams = [];
+      if (filters.party_type) {
+        ledgerQuery += ' AND l.party_type = ?';
+        ledgerParams.push(filters.party_type);
+      }
+      if (filters.party_id) {
+        ledgerQuery += ' AND l.party_id = ?';
+        ledgerParams.push(filters.party_id);
+      }
+      if (filters.startDate && filters.endDate) {
+        ledgerQuery += ' AND date(l.entry_date) BETWEEN ? AND ?';
+        ledgerParams.push(filters.startDate, filters.endDate);
+      }
+      ledgerQuery += ' ORDER BY l.entry_date DESC, l.id DESC LIMIT 500';
+      return db.prepare(ledgerQuery).all(...ledgerParams);
+    }
+
+    return paymentsList;
+  },
+
   recordPaymentReceipt(data, username = 'Cashier') {
     return runInTransaction((db) => {
       const partyType = data.party_type; // 'CUSTOMER' or 'SUPPLIER'

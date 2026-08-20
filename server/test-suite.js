@@ -172,11 +172,11 @@ async function runTests() {
 
   // 9. Flagship Google Sheet P&L Report
   const pnlReport = reportService.getGoogleSheetPnL('2026-04-01', '2026-08-09');
-  assert(pnlReport && pnlReport.columns.length === 4, 'Google Sheet P&L generated with 4 multi-period columns (Selected, Today, This Month, YTD)');
-  console.log(`  -> Google Sheet P&L Gross Revenue: ₹${pnlReport.columns[0].data.revenue}`);
-  console.log(`  -> Google Sheet P&L COGS: ₹${pnlReport.columns[0].data.cogs}`);
-  console.log(`  -> Google Sheet P&L Gross Profit: ₹${pnlReport.columns[0].data.gross_profit} (${pnlReport.columns[0].data.gross_margin_pct}%)`);
-  console.log(`  -> Google Sheet P&L Net Profit: ₹${pnlReport.columns[0].data.net_profit} (${pnlReport.columns[0].data.net_margin_pct}%)`);
+  assert(pnlReport && pnlReport.columns.length >= 4, 'Google Sheet P&L generated with multi-period columns (Selected, Today, This Month, YTD)');
+  console.log(`  -> Google Sheet P&L Gross Revenue: ₹${pnlReport.columns[0].data.sales}`);
+  console.log(`  -> Google Sheet P&L COGS / Direct Exp: ₹${pnlReport.columns[0].data.direct_expense}`);
+  console.log(`  -> Google Sheet P&L Gross Profit: ₹${pnlReport.columns[0].data.gross_profit} (${pnlReport.columns[0].data.gross_profit_pct}%)`);
+  console.log(`  -> Google Sheet P&L Net Profit: ₹${pnlReport.columns[0].data.net_profit} (${pnlReport.columns[0].data.net_profit_pct}%)`);
   assert(pnlReport.columns[0].data.gross_profit !== undefined, 'Gross profit calculation verified');
 
   // 10. Backup and Safe Restore

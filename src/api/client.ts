@@ -341,7 +341,21 @@ export const api = {
     if (endDate) q += `&endDate=${endDate}`;
     return request<any>(`/ledger/statement?${q}`);
   },
+  getPayments: (params: any = {}) => {
+    const q = new URLSearchParams(params).toString();
+    return request<any[]>(`/payments${q ? `?${q}` : ''}`);
+  },
   recordPayment: (data: any) => request<any>('/payments', {
+    method: 'POST',
+    body: JSON.stringify(data)
+  }),
+
+  // Returns / Credit & Debit Notes
+  getPurchaseReturns: (params: any = {}) => {
+    const q = new URLSearchParams(params).toString();
+    return request<any[]>(`/purchase-returns${q ? `?${q}` : ''}`);
+  },
+  createPurchaseReturn: (data: any) => request<any>('/purchase-returns', {
     method: 'POST',
     body: JSON.stringify(data)
   }),
