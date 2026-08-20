@@ -1,0 +1,47 @@
+{
+  "name": "matuki-business-erp",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "MATUKI SWEETS Offline Business ERP - Sweets & Snacks Manufacturing and Accounting Management System",
+  "main": "electron/main.js",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview",
+    "server": "node server/index.js",
+    "app": "concurrently \"node server/index.js\" \"vite\""
+  },
+  "keywords": [
+    "erp",
+    "sweets",
+    "manufacturing",
+    "offline",
+    "sqlite",
+    "recipe-costing",
+    "accounting",
+    "inventory"
+  ],
+  "author": "MATUKI SWEETS",
+  "license": "ISC",
+  "dependencies": {
+    "@whiskeysockets/baileys": "^6.7.18",
+    "html2canvas": "^1.4.1",
+    "jspdf": "^4.2.1",
+    "jspdf-autotable": "^5.0.8",
+    "lucide-react": "^1.16.0",
+    "pino": "^9.6.0",
+    "qrcode": "^1.5.4",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.1",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "@vitejs/plugin-basic-ssl": "^2.3.0",
+    "@vitejs/plugin-react": "^4.3.4",
+    "concurrently": "^9.1.0",
+    "typescript": "^5.7.2",
+    "vite": "^6.0.3"
+  }
+}

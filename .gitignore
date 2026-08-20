@@ -1,0 +1,30 @@
+# Dependencies
+node_modules/
+
+# Production build outputs
+dist/
+
+# Database files (Keeps business data safe & separate from code updates)
+data/
+*.db
+*.db-wal
+*.db-shm
+
+# Backup archives
+backups/
+
+# Uploaded files
+uploads/
+
+# Environment variables
+.env
+.env.local
+
+# Logs
+*.log
+logs/
+
+# IDE / OS files
+.DS_Store
+.idea/
+.vscode/
