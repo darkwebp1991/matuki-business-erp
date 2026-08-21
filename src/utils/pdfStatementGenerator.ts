@@ -33,23 +33,19 @@ interface StatementReportData {
   entries: StatementEntry[];
 }
 
-// Clean helper to format PDF currency amounts WITHOUT any rupee symbol or unicode '¹' superscript
+// Clean helper to format PDF currency amounts as clean whole numbers WITHOUT trailing .00 or unicode '¹' superscript
 export const formatPdfNum = (val: number | string | null | undefined): string => {
   if (val === null || val === undefined || val === '') return '-';
   const num = Number(val);
   if (isNaN(num) || num === 0) return '-';
-  return num.toLocaleString('en-IN', {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2
-  });
+  const rounded = Math.round(num);
+  return rounded.toLocaleString('en-IN');
 };
 
 export const formatPdfNumBold = (val: number | string | null | undefined): string => {
   const num = Number(val || 0);
-  return num.toLocaleString('en-IN', {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2
-  });
+  const rounded = Math.round(num);
+  return rounded.toLocaleString('en-IN');
 };
 
 // Clean helper to sanitize non-ASCII or Gujarati text for jsPDF standard Helvetica font
