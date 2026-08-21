@@ -7,8 +7,7 @@ export const partyService = {
     const db = getDatabase();
     let query = `
       SELECT c.*,
-        COALESCE(c.opening_balance, 0) +
-        COALESCE((SELECT SUM(debit_amount) - SUM(credit_amount) FROM ledger_entries WHERE party_type = 'CUSTOMER' AND party_id = c.id), 0) as current_balance,
+        COALESCE(c.opening_balance, 0) as current_balance,
         (SELECT COUNT(*) FROM sales WHERE customer_id = c.id AND status != 'CANCELLED') as total_invoices,
         (SELECT COALESCE(SUM(grand_total), 0) FROM sales WHERE customer_id = c.id AND status != 'CANCELLED') as total_sales_amount,
         (SELECT MAX(payment_date) FROM payments WHERE party_type = 'CUSTOMER' AND party_id = c.id) as last_payment_date,
@@ -338,8 +337,7 @@ export const partyService = {
     const db = getDatabase();
     let query = `
       SELECT s.*,
-        COALESCE(s.opening_balance, 0) +
-        COALESCE((SELECT SUM(credit_amount) - SUM(debit_amount) FROM ledger_entries WHERE party_type = 'SUPPLIER' AND party_id = s.id), 0) as current_balance,
+        COALESCE(s.opening_balance, 0) as current_balance,
         (SELECT COUNT(*) FROM purchases WHERE supplier_id = s.id) as total_purchases,
         (SELECT COALESCE(SUM(grand_total), 0) FROM purchases WHERE supplier_id = s.id AND status = 'ACTIVE') as total_purchase_amount
       FROM suppliers s
