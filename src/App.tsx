@@ -37,7 +37,7 @@ import { InvoicePrintModal } from './components/sales/InvoicePrintModal';
 import { MobileBottomNav } from './components/common/MobileBottomNav';
 import { MobileMoreDrawer } from './components/common/MobileMoreDrawer';
 import { hasModuleAccess } from './utils/permissionUtils';
-import { Mic, Sparkles } from 'lucide-react';
+import { Sparkles } from 'lucide-react';
 
 export function App() {
   // Check if current URL is for public customer self-ordering
@@ -478,7 +478,7 @@ export function App() {
       <VoiceAssistantModal
         isOpen={isVoiceAssistantOpen}
         onClose={() => setIsVoiceAssistantOpen(false)}
-        onNavigate={(mod) => {
+        onNavigate={(mod: any) => {
           setActiveModule(mod as NavModule);
           addToast('info', `Navigated to ${mod}`);
         }}

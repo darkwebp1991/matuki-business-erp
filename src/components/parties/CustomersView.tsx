@@ -290,17 +290,11 @@ export const CustomersView: React.FC<CustomersViewProps> = ({ initialSearch = ''
             <input
               type="text"
               className="form-input"
-              style={{ paddingLeft: '30px', paddingRight: '34px', padding: '5px 34px 5px 30px', fontSize: '0.8rem', width: '100%' }}
-              placeholder="Search customer / mobile (or speak)..."
+              style={{ paddingLeft: '30px', paddingRight: '10px', padding: '5px 10px 5px 30px', fontSize: '0.8rem', width: '100%' }}
+              placeholder="Search customer / mobile..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
-            <div style={{ position: 'absolute', right: '4px' }}>
-              <VoiceSearchButton 
-                onTranscript={(spoken) => setSearch(spoken)}
-                title="🎙️ બોલીને ગ્રાહક શોધો (Speak customer name in Gujarati)"
-              />
-            </div>
           </div>
 
           {/* Vyapar-Style Sort Toolbar */}

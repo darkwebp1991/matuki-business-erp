@@ -312,17 +312,11 @@ export const ManufacturingView: React.FC<ManufacturingViewProps> = () => {
                 <input
                   type="text"
                   className="form-input"
-                  style={{ paddingLeft: '30px', paddingRight: '34px', padding: '5px 34px 5px 30px', fontSize: '0.8rem', width: '100%' }}
+                  style={{ paddingLeft: '30px', paddingRight: '10px', padding: '5px 10px 5px 30px', fontSize: '0.8rem', width: '100%' }}
                   placeholder="Search sweet formula..."
                   value={recipeSearch}
                   onChange={(e) => setRecipeSearch(e.target.value)}
                 />
-                <div style={{ position: 'absolute', right: '4px' }}>
-                  <VoiceSearchButton 
-                    onTranscript={(spoken) => setRecipeSearch(spoken)}
-                    title="🎙️ બોલીને રેસિપી શોધો"
-                  />
-                </div>
               </div>
             </div>
 

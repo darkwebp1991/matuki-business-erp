@@ -436,17 +436,11 @@ export const OrderPlannerView: React.FC<OrderPlannerViewProps> = ({
               <input
                 type="text"
                 className="form-input"
-                style={{ paddingLeft: '28px', paddingRight: '32px', fontSize: '0.8rem', width: '200px', height: '32px' }}
+                style={{ paddingLeft: '28px', paddingRight: '10px', fontSize: '0.8rem', width: '200px', height: '32px' }}
                 placeholder="Search Caterer / Venue..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
               />
-              <div style={{ position: 'absolute', right: '3px' }}>
-                <VoiceSearchButton 
-                  onTranscript={(spoken) => setSearch(spoken)}
-                  title="🎙️ બોલીને ઓર્ડર શોધો (Speak order name in Gujarati)"
-                />
-              </div>
             </div>
 
             {/* Slot Filter */}

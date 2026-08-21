@@ -186,17 +186,11 @@ export const SuppliersView: React.FC<SuppliersViewProps> = ({ initialSearch = ''
             <input
               type="text"
               className="form-input"
-              style={{ paddingLeft: '30px', paddingRight: '34px', padding: '5px 34px 5px 30px', fontSize: '0.8rem', width: '100%' }}
-              placeholder="Search vendor / mobile (or speak)..."
+              style={{ paddingLeft: '30px', paddingRight: '10px', padding: '5px 10px 5px 30px', fontSize: '0.8rem', width: '100%' }}
+              placeholder="Search vendor / mobile..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
-            <div style={{ position: 'absolute', right: '4px' }}>
-              <VoiceSearchButton 
-                onTranscript={(spoken) => setSearch(spoken)}
-                title="🎙️ બોલીને વેપારી શોધો (Speak supplier name in Gujarati)"
-              />
-            </div>
           </div>
 
           {/* Vyapar-Style Sort Toolbar */}

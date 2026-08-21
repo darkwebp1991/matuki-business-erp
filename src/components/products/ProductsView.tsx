@@ -295,17 +295,11 @@ export const ProductsView: React.FC<ProductsViewProps> = ({ initialSearch = '', 
                 <input
                   type="text"
                   className="form-input"
-                  style={{ paddingLeft: '30px', paddingRight: '34px', padding: '6px 34px 6px 30px', fontSize: '0.82rem', width: '100%' }}
-                  placeholder="Search sweet / code (or speak)..."
+                  style={{ paddingLeft: '30px', paddingRight: '10px', padding: '6px 10px 6px 30px', fontSize: '0.82rem', width: '100%' }}
+                  placeholder="Search sweet / code..."
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                 />
-                <div style={{ position: 'absolute', right: '4px' }}>
-                  <VoiceSearchButton 
-                    onTranscript={(spoken) => setSearch(spoken)}
-                    title="🎙️ બોલીને મીઠાઈ શોધો (Speak sweet name in Gujarati)"
-                  />
-                </div>
               </div>
 
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-secondary)', marginTop: '8px', padding: '0 4px' }}>

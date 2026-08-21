@@ -167,22 +167,11 @@ export const Navbar: React.FC<NavbarProps> = ({
                 border: '1px solid var(--border-color)',
                 width: '100%'
               }}
-              placeholder="Search sweets, parties, bills (or speak)..."
+              placeholder="Search sweets, parties, bills..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               onKeyDown={handleSearchKeyDown}
             />
-            <div style={{ position: 'absolute', right: '4px' }}>
-              <VoiceSearchButton 
-                onTranscript={(spoken) => {
-                  setSearchQuery(spoken);
-                  if (onGlobalSearch) {
-                    onGlobalSearch(spoken);
-                  }
-                }}
-                title="🎙️ બોલીને સર્ચ કરો (ગુલાબ જાંબુ / કાજુ કતરી / પાર્ટી)"
-              />
-            </div>
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.7rem', color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>
@@ -192,29 +181,6 @@ export const Navbar: React.FC<NavbarProps> = ({
 
         {/* Right: Desktop Action Buttons */}
         <div className="desktop-only" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          {/* Voice Assistant Trigger */}
-          {onOpenVoiceAssistant && (
-            <button
-              type="button"
-              className="btn btn-sm"
-              onClick={onOpenVoiceAssistant}
-              title="🎙️ બોલો અને કામ કરો - ગુજરાતી વોઇસ સહાયક"
-              style={{
-                background: 'linear-gradient(135deg, #ef4444 0%, #ea580c 100%)',
-                color: '#ffffff',
-                border: 'none',
-                fontWeight: 800,
-                padding: '5px 10px',
-                borderRadius: '6px',
-                boxShadow: '0 2px 6px rgba(239, 68, 68, 0.35)',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '5px'
-              }}
-            >
-              <Mic size={14} className="animate-pulse" /> બોલો (Voice)
-            </button>
-          )}
 
           {/* Add Sale Button */}
           {canEditSales && (
