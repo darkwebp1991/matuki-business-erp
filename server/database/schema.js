@@ -756,4 +756,13 @@ CREATE INDEX IF NOT EXISTS idx_adv_orders_customer ON advance_orders(customer_id
 CREATE INDEX IF NOT EXISTS idx_adv_order_items_order ON advance_order_items(order_id);
 CREATE INDEX IF NOT EXISTS idx_wa_orders_status ON whatsapp_inbound_orders(status);
 CREATE INDEX IF NOT EXISTS idx_wa_orders_received ON whatsapp_inbound_orders(received_at);
+CREATE INDEX IF NOT EXISTS idx_sale_items_sale ON sale_items(sale_id);
+CREATE INDEX IF NOT EXISTS idx_sale_items_product ON sale_items(product_id);
+CREATE INDEX IF NOT EXISTS idx_purchase_items_purchase ON purchase_items(purchase_id);
+CREATE INDEX IF NOT EXISTS idx_purchase_items_product ON purchase_items(product_id);
+CREATE INDEX IF NOT EXISTS idx_purchase_items_raw_material ON purchase_items(raw_material_id);
+CREATE INDEX IF NOT EXISTS idx_payments_party ON payments(party_type, party_id);
+CREATE INDEX IF NOT EXISTS idx_ledger_party_name ON ledger_entries(party_type, party_name);
+CREATE INDEX IF NOT EXISTS idx_customers_name ON customers(name);
+CREATE INDEX IF NOT EXISTS idx_suppliers_name ON suppliers(name);
 `;

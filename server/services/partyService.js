@@ -7,7 +7,11 @@ export const partyService = {
     const db = getDatabase();
     let query = `
       SELECT c.*,
-        COALESCE(c.opening_balance, 0) as current_balance,
+        (COALESCE(c.opening_balance, 0)
+          + COALESCE((SELECT SUM(grand_total) FROM sales WHERE customer_id = c.id AND status = 'ACTIVE'), 0)
+          - COALESCE((SELECT SUM(amount) FROM payments WHERE party_type = 'CUSTOMER' AND party_id = c.id), 0)
+          + COALESCE((SELECT SUM(debit_amount - credit_amount) FROM ledger_entries WHERE party_type = 'CUSTOMER' AND (party_id = c.id OR party_name = c.name) AND voucher_type NOT IN ('SALE', 'PAYMENT_IN', 'OPENING_BALANCE', 'RECEIPT')), 0)
+        ) as current_balance,
         (SELECT COUNT(*) FROM sales WHERE customer_id = c.id AND status != 'CANCELLED') as total_invoices,
         (SELECT COALESCE(SUM(grand_total), 0) FROM sales WHERE customer_id = c.id AND status != 'CANCELLED') as total_sales_amount,
         (SELECT MAX(payment_date) FROM payments WHERE party_type = 'CUSTOMER' AND party_id = c.id) as last_payment_date,
@@ -93,8 +97,11 @@ export const partyService = {
     const db = getDatabase();
     const customer = db.prepare(`
       SELECT c.*,
-        COALESCE(c.opening_balance, 0) +
-        COALESCE((SELECT SUM(debit_amount) - SUM(credit_amount) FROM ledger_entries WHERE party_type = 'CUSTOMER' AND party_id = c.id), 0) as current_balance,
+        (COALESCE(c.opening_balance, 0)
+          + COALESCE((SELECT SUM(grand_total) FROM sales WHERE customer_id = c.id AND status = 'ACTIVE'), 0)
+          - COALESCE((SELECT SUM(amount) FROM payments WHERE party_type = 'CUSTOMER' AND party_id = c.id), 0)
+          + COALESCE((SELECT SUM(debit_amount - credit_amount) FROM ledger_entries WHERE party_type = 'CUSTOMER' AND (party_id = c.id OR party_name = c.name) AND voucher_type NOT IN ('SALE', 'PAYMENT_IN', 'OPENING_BALANCE', 'RECEIPT')), 0)
+        ) as current_balance,
         (SELECT COUNT(*) FROM sales WHERE customer_id = c.id AND status != 'CANCELLED') as total_invoices,
         (SELECT COALESCE(SUM(grand_total), 0) FROM sales WHERE customer_id = c.id AND status != 'CANCELLED') as total_sales_amount,
         (SELECT MAX(payment_date) FROM payments WHERE party_type = 'CUSTOMER' AND party_id = c.id) as last_payment_date,
@@ -317,11 +324,12 @@ export const partyService = {
       id
     );
 
-    // Update name in ledger entries if changed
+    // Update name in ledger entries if changed (some historical rows only match by
+    // party_name since they lack a party_id, so update those too)
     if (trimmedName && trimmedName !== existing.name) {
       db.prepare(`
-        UPDATE ledger_entries SET party_name = ? WHERE party_type = 'CUSTOMER' AND party_id = ?
-      `).run(trimmedName, id);
+        UPDATE ledger_entries SET party_name = ? WHERE party_type = 'CUSTOMER' AND (party_id = ? OR party_name = ?)
+      `).run(trimmedName, id, existing.name);
     }
 
     db.prepare(`
@@ -337,7 +345,11 @@ export const partyService = {
     const db = getDatabase();
     let query = `
       SELECT s.*,
-        COALESCE(s.opening_balance, 0) as current_balance,
+        (COALESCE(s.opening_balance, 0)
+          + COALESCE((SELECT SUM(grand_total) FROM purchases WHERE supplier_id = s.id AND status = 'ACTIVE'), 0)
+          - COALESCE((SELECT SUM(amount) FROM payments WHERE party_type = 'SUPPLIER' AND party_id = s.id), 0)
+          + COALESCE((SELECT SUM(credit_amount - debit_amount) FROM ledger_entries WHERE party_type = 'SUPPLIER' AND (party_id = s.id OR party_name = s.name) AND voucher_type NOT IN ('PURCHASE', 'PAYMENT_OUT', 'OPENING_BALANCE')), 0)
+        ) as current_balance,
         (SELECT COUNT(*) FROM purchases WHERE supplier_id = s.id) as total_purchases,
         (SELECT COALESCE(SUM(grand_total), 0) FROM purchases WHERE supplier_id = s.id AND status = 'ACTIVE') as total_purchase_amount
       FROM suppliers s
@@ -375,8 +387,11 @@ export const partyService = {
     const db = getDatabase();
     const supplier = db.prepare(`
       SELECT s.*,
-        COALESCE(s.opening_balance, 0) +
-        COALESCE((SELECT SUM(credit_amount) - SUM(debit_amount) FROM ledger_entries WHERE party_type = 'SUPPLIER' AND party_id = s.id), 0) as current_balance,
+        (COALESCE(s.opening_balance, 0)
+          + COALESCE((SELECT SUM(grand_total) FROM purchases WHERE supplier_id = s.id AND status = 'ACTIVE'), 0)
+          - COALESCE((SELECT SUM(amount) FROM payments WHERE party_type = 'SUPPLIER' AND party_id = s.id), 0)
+          + COALESCE((SELECT SUM(credit_amount - debit_amount) FROM ledger_entries WHERE party_type = 'SUPPLIER' AND (party_id = s.id OR party_name = s.name) AND voucher_type NOT IN ('PURCHASE', 'PAYMENT_OUT', 'OPENING_BALANCE')), 0)
+        ) as current_balance,
         (SELECT COUNT(*) FROM purchases WHERE supplier_id = s.id) as total_purchases,
         (SELECT COALESCE(SUM(grand_total), 0) FROM purchases WHERE supplier_id = s.id AND status = 'ACTIVE') as total_purchase_amount
       FROM suppliers s
@@ -549,11 +564,12 @@ export const partyService = {
       id
     );
 
-    // Update name in ledger entries if changed
+    // Update name in ledger entries if changed (some historical rows only match by
+    // party_name since they lack a party_id, so update those too)
     if (trimmedName && trimmedName !== existing.name) {
       db.prepare(`
-        UPDATE ledger_entries SET party_name = ? WHERE party_type = 'SUPPLIER' AND party_id = ?
-      `).run(trimmedName, id);
+        UPDATE ledger_entries SET party_name = ? WHERE party_type = 'SUPPLIER' AND (party_id = ? OR party_name = ?)
+      `).run(trimmedName, id, existing.name);
     }
 
     db.prepare(`
@@ -580,25 +596,7 @@ export const partyService = {
 
     if (!party) throw new Error(`${partyType} ID ${partyId} not found`);
 
-    // 2. Compute Opening Balance before startDate
-    let openingBalance = 0.0;
-    if (startDate) {
-      const prevEntries = db.prepare(`
-        SELECT 
-          COALESCE(SUM(debit_amount), 0) as total_debit,
-          COALESCE(SUM(credit_amount), 0) as total_credit
-        FROM ledger_entries
-        WHERE party_type = ? AND party_id = ? AND entry_date < ?
-      `).get(partyType, pId, startDate);
-
-      if (partyType === 'CUSTOMER') {
-        openingBalance = Number(prevEntries.total_debit) - Number(prevEntries.total_credit);
-      } else {
-        openingBalance = Number(prevEntries.total_credit) - Number(prevEntries.total_debit);
-      }
-    }
-
-    // 3. Fetch all entries (Sales, Purchases, Payments, Returns, Ledger Entries) for this party
+    // 2. Fetch all entries (Sales, Purchases, Payments, Returns, Ledger Entries) for this party
     let allEntries = [];
 
     if (partyType === 'CUSTOMER') {
@@ -653,21 +651,33 @@ export const partyService = {
       allEntries = [...partyPurchases, ...partyPayments, ...partyLedger];
     }
 
-    // Filter by date range if specified
-    if (startDate && endDate) {
-      allEntries = allEntries.filter(e => e.entry_date >= startDate && e.entry_date <= endDate);
-    } else if (startDate) {
-      allEntries = allEntries.filter(e => e.entry_date >= startDate);
-    } else if (endDate) {
-      allEntries = allEntries.filter(e => e.entry_date <= endDate);
-    }
-
     // Sort entries chronologically
     allEntries.sort((a, b) => (a.entry_date || '').localeCompare(b.entry_date || ''));
 
+    // 3. Opening balance = party's stored opening balance plus every entry strictly
+    // before this statement's startDate (keeps the statement in sync with the party's
+    // current_balance shown elsewhere, which is computed the same way).
+    let openingBalance = Number(party.opening_balance || 0);
+    let periodEntries = allEntries;
+
+    if (startDate) {
+      const before = allEntries.filter(e => (e.entry_date || '') < startDate);
+      for (const e of before) {
+        if (partyType === 'CUSTOMER') {
+          openingBalance += (Number(e.debit_amount || 0) - Number(e.credit_amount || 0));
+        } else {
+          openingBalance += (Number(e.credit_amount || 0) - Number(e.debit_amount || 0));
+        }
+      }
+      periodEntries = allEntries.filter(e => (e.entry_date || '') >= startDate);
+    }
+    if (endDate) {
+      periodEntries = periodEntries.filter(e => (e.entry_date || '') <= endDate);
+    }
+
     // 4. Compute running balance starting from period opening balance
     let runningBalance = openingBalance;
-    const computedEntries = allEntries.map(entry => {
+    const computedEntries = periodEntries.map(entry => {
       if (partyType === 'CUSTOMER') {
         runningBalance += (Number(entry.debit_amount || 0) - Number(entry.credit_amount || 0));
       } else {
@@ -680,15 +690,15 @@ export const partyService = {
       };
     });
 
-    const totalDebit = allEntries.reduce((sum, e) => sum + Number(e.debit_amount || 0), 0);
-    const totalCredit = allEntries.reduce((sum, e) => sum + Number(e.credit_amount || 0), 0);
+    const totalDebit = periodEntries.reduce((sum, e) => sum + Number(e.debit_amount || 0), 0);
+    const totalCredit = periodEntries.reduce((sum, e) => sum + Number(e.credit_amount || 0), 0);
 
     return {
       party,
       party_type: partyType,
       party_id: partyId,
-      startDate: startDate || (allEntries.length > 0 ? allEntries[0].entry_date : null),
-      endDate: endDate || (allEntries.length > 0 ? allEntries[allEntries.length - 1].entry_date : null),
+      startDate: startDate || (periodEntries.length > 0 ? periodEntries[0].entry_date : null),
+      endDate: endDate || (periodEntries.length > 0 ? periodEntries[periodEntries.length - 1].entry_date : null),
       opening_balance: Math.round(openingBalance * 100) / 100,
       total_debit: Math.round(totalDebit * 100) / 100,
       total_credit: Math.round(totalCredit * 100) / 100,
