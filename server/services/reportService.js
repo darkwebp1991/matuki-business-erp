@@ -70,23 +70,15 @@ export const reportService = {
     `).get(startDate, endDate);
 
     const receivables = db.prepare(`
-      SELECT
-        COALESCE(SUM(
-          COALESCE(c.opening_balance, 0) +
-          COALESCE((SELECT SUM(debit_amount) - SUM(credit_amount) FROM ledger_entries WHERE party_type = 'CUSTOMER' AND party_id = c.id), 0)
-        ), 0) as total_receivable
+      SELECT COALESCE(SUM(c.opening_balance), 0) as total_receivable
       FROM customers c
-      WHERE c.active = 1
+      WHERE c.active = 1 AND c.opening_balance > 0
     `).get();
 
     const payables = db.prepare(`
-      SELECT
-        COALESCE(SUM(
-          COALESCE(s.opening_balance, 0) +
-          COALESCE((SELECT SUM(credit_amount) - SUM(debit_amount) FROM ledger_entries WHERE party_type = 'SUPPLIER' AND party_id = s.id), 0)
-        ), 0) as total_payable
+      SELECT COALESCE(SUM(s.opening_balance), 0) as total_payable
       FROM suppliers s
-      WHERE s.active = 1
+      WHERE s.active = 1 AND s.opening_balance > 0
     `).get();
 
     const cashBalance = db.prepare(`
