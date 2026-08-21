@@ -850,6 +850,10 @@ const server = http.createServer(async (req, res) => {
       const data = reportService.getSaleReport(query.startDate, query.endDate);
       return sendJson(res, 200, { success: true, data });
     }
+    if (pathname === '/api/reports/party-statement' && method === 'GET') {
+      const data = partyService.getPartyLedgerStatement(query.party_type || 'CUSTOMER', Number(query.party_id), query.startDate, query.endDate);
+      return sendJson(res, 200, { success: true, data });
+    }
     if (pathname === '/api/reports/purchases' && method === 'GET') {
       const data = reportService.getPurchaseReport(query.startDate, query.endDate);
       return sendJson(res, 200, { success: true, data });

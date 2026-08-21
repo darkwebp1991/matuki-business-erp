@@ -600,36 +600,80 @@ export const partyService = {
       }
     }
 
-    // 3. Fetch entries within the selected period
-    let query = `
-      SELECT * FROM ledger_entries
-      WHERE party_type = ? AND party_id = ?
-    `;
-    const params = [partyType, pId];
+    // 3. Fetch all entries (Sales, Purchases, Payments, Returns, Ledger Entries) for this party
+    let allEntries = [];
 
-    if (startDate && endDate) {
-      query += ' AND entry_date BETWEEN ? AND ?';
-      params.push(startDate, endDate);
-    } else if (startDate) {
-      query += ' AND entry_date >= ?';
-      params.push(startDate);
-    } else if (endDate) {
-      query += ' AND entry_date <= ?';
-      params.push(endDate);
+    if (partyType === 'CUSTOMER') {
+      // Fetch Sales
+      const partySales = db.prepare(`
+        SELECT date as entry_date, 'SALE' as voucher_type, invoice_no as voucher_no,
+               grand_total as debit_amount, 0 as credit_amount, COALESCE(notes, 'Sale Invoice') as notes
+        FROM sales
+        WHERE status = 'ACTIVE' AND (customer_id = ? OR customer_name = ?)
+      `).all(pId, party.name);
+
+      // Fetch Payments Received
+      const partyPayments = db.prepare(`
+        SELECT payment_date as entry_date, 'PAYMENT_IN' as voucher_type, payment_no as voucher_no,
+               0 as debit_amount, amount as credit_amount, COALESCE(notes, 'Payment Received') as notes
+        FROM payments
+        WHERE party_type = 'CUSTOMER' AND (party_id = ? OR party_name = ?)
+      `).all(pId, party.name);
+
+      // Fetch Credit Notes / Ledger Returns
+      const partyLedger = db.prepare(`
+        SELECT entry_date, voucher_type, voucher_no, debit_amount, credit_amount, notes
+        FROM ledger_entries
+        WHERE party_type = 'CUSTOMER' AND (party_id = ? OR party_name = ?) AND voucher_type NOT IN ('SALE', 'PAYMENT_IN')
+      `).all(pId, party.name);
+
+      allEntries = [...partySales, ...partyPayments, ...partyLedger];
+    } else {
+      // Fetch Purchases
+      const partyPurchases = db.prepare(`
+        SELECT date as entry_date, 'PURCHASE' as voucher_type, purchase_no as voucher_no,
+               0 as debit_amount, grand_total as credit_amount, COALESCE(notes, 'Purchase Invoice') as notes
+        FROM purchases
+        WHERE status = 'ACTIVE' AND (supplier_id = ? OR supplier_name = ?)
+      `).all(pId, party.name);
+
+      // Fetch Payments Paid
+      const partyPayments = db.prepare(`
+        SELECT payment_date as entry_date, 'PAYMENT_OUT' as voucher_type, payment_no as voucher_no,
+               amount as debit_amount, 0 as credit_amount, COALESCE(notes, 'Payment Paid') as notes
+        FROM payments
+        WHERE party_type = 'SUPPLIER' AND (party_id = ? OR party_name = ?)
+      `).all(pId, party.name);
+
+      // Fetch Debit Notes / Ledger Returns
+      const partyLedger = db.prepare(`
+        SELECT entry_date, voucher_type, voucher_no, debit_amount, credit_amount, notes
+        FROM ledger_entries
+        WHERE party_type = 'SUPPLIER' AND (party_id = ? OR party_name = ?) AND voucher_type NOT IN ('PURCHASE', 'PAYMENT_OUT')
+      `).all(pId, party.name);
+
+      allEntries = [...partyPurchases, ...partyPayments, ...partyLedger];
     }
 
-    query += ' ORDER BY entry_date ASC, id ASC';
-    const entries = db.prepare(query).all(...params);
+    // Filter by date range if specified
+    if (startDate && endDate) {
+      allEntries = allEntries.filter(e => e.entry_date >= startDate && e.entry_date <= endDate);
+    } else if (startDate) {
+      allEntries = allEntries.filter(e => e.entry_date >= startDate);
+    } else if (endDate) {
+      allEntries = allEntries.filter(e => e.entry_date <= endDate);
+    }
+
+    // Sort entries chronologically
+    allEntries.sort((a, b) => (a.entry_date || '').localeCompare(b.entry_date || ''));
 
     // 4. Compute running balance starting from period opening balance
     let runningBalance = openingBalance;
-    const computedEntries = entries.map(entry => {
+    const computedEntries = allEntries.map(entry => {
       if (partyType === 'CUSTOMER') {
-        // Customer: Debit increases receivable (+), Credit reduces receivable (-)
-        runningBalance += (Number(entry.debit_amount) - Number(entry.credit_amount));
+        runningBalance += (Number(entry.debit_amount || 0) - Number(entry.credit_amount || 0));
       } else {
-        // Supplier: Credit increases payable (+), Debit reduces payable (-)
-        runningBalance += (Number(entry.credit_amount) - Number(entry.debit_amount));
+        runningBalance += (Number(entry.credit_amount || 0) - Number(entry.debit_amount || 0));
       }
 
       return {
@@ -638,15 +682,15 @@ export const partyService = {
       };
     });
 
-    const totalDebit = entries.reduce((sum, e) => sum + Number(e.debit_amount), 0);
-    const totalCredit = entries.reduce((sum, e) => sum + Number(e.credit_amount), 0);
+    const totalDebit = allEntries.reduce((sum, e) => sum + Number(e.debit_amount || 0), 0);
+    const totalCredit = allEntries.reduce((sum, e) => sum + Number(e.credit_amount || 0), 0);
 
     return {
       party,
       party_type: partyType,
       party_id: partyId,
-      startDate: startDate || (entries.length > 0 ? entries[0].entry_date : null),
-      endDate: endDate || (entries.length > 0 ? entries[entries.length - 1].entry_date : null),
+      startDate: startDate || (allEntries.length > 0 ? allEntries[0].entry_date : null),
+      endDate: endDate || (allEntries.length > 0 ? allEntries[allEntries.length - 1].entry_date : null),
       opening_balance: Math.round(openingBalance * 100) / 100,
       total_debit: Math.round(totalDebit * 100) / 100,
       total_credit: Math.round(totalCredit * 100) / 100,
