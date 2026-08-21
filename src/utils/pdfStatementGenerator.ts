@@ -1,6 +1,5 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import { formatCurrency, formatDate } from './formatters';
 
 interface StatementParty {
   name: string;
@@ -34,6 +33,46 @@ interface StatementReportData {
   entries: StatementEntry[];
 }
 
+// Clean helper to format PDF currency amounts WITHOUT any rupee symbol or unicode '¹' superscript
+export const formatPdfNum = (val: number | string | null | undefined): string => {
+  if (val === null || val === undefined || val === '') return '-';
+  const num = Number(val);
+  if (isNaN(num) || num === 0) return '-';
+  return num.toLocaleString('en-IN', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  });
+};
+
+export const formatPdfNumBold = (val: number | string | null | undefined): string => {
+  const num = Number(val || 0);
+  return num.toLocaleString('en-IN', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  });
+};
+
+// Clean helper to sanitize non-ASCII or Gujarati text for jsPDF standard Helvetica font
+const sanitizePdfText = (text: string | undefined | null): string => {
+  if (!text) return '';
+  // Remove non-ASCII characters that cause font corruption in jsPDF standard fonts
+  const cleaned = text.replace(/[^\x00-\x7F]/g, '').trim();
+  return cleaned || '';
+};
+
+const formatDatePdf = (dateStr: string | null | undefined): string => {
+  if (!dateStr) return '';
+  try {
+    const parts = dateStr.split('-');
+    if (parts.length === 3) {
+      const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      const mIdx = parseInt(parts[1], 10) - 1;
+      return `${parts[2]} ${months[mIdx] || parts[1]} ${parts[0]}`;
+    }
+  } catch (e) {}
+  return dateStr;
+};
+
 export const generateAndDownloadPartyStatementPDF = (
   reportData: StatementReportData,
   startDate: string,
@@ -49,15 +88,18 @@ export const generateAndDownloadPartyStatementPDF = (
   const isCustomer = reportData.party_type === 'CUSTOMER';
   const partyTypeName = isCustomer ? 'CUSTOMER' : 'SUPPLIER';
 
+  const sanitizedName = party.name || 'N/A';
+  const sanitizedAddress = sanitizePdfText(party.address) || 'Surat, Gujarat';
+
   // 1. BRAND HEADER (Top Bar)
-  doc.setFillColor(211, 47, 47); // Crimson Red
+  doc.setFillColor(211, 47, 47); // Crimson Red Logo Box
   doc.rect(14, 12, 12, 12, 'F');
   doc.setTextColor(255, 255, 255);
   doc.setFontSize(10);
   doc.setFont('helvetica', 'bold');
   doc.text('MS', 20, 20, { align: 'center' });
 
-  doc.setTextColor(15, 23, 42); // Dark Navy
+  doc.setTextColor(15, 23, 42); // Dark Navy Header Text
   doc.setFontSize(16);
   doc.setFont('helvetica', 'bold');
   doc.text('MATUKI SWEETS', 30, 18);
@@ -79,13 +121,13 @@ export const generateAndDownloadPartyStatementPDF = (
   doc.setTextColor(51, 65, 85);
   doc.setFontSize(8);
   doc.setFont('helvetica', 'bold');
-  doc.text(`Period: ${formatDate(startDate)} to ${formatDate(endDate)}`, 196, 24, { align: 'right' });
+  doc.text(`Period: ${formatDatePdf(startDate)} to ${formatDatePdf(endDate)}`, 196, 24, { align: 'right' });
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(7.5);
   doc.setTextColor(100, 116, 139);
   doc.text(`Date: ${new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}`, 196, 28, { align: 'right' });
 
-  // Divider line
+  // Top Divider line
   doc.setDrawColor(203, 213, 225);
   doc.setLineWidth(0.5);
   doc.line(14, 32, 196, 32);
@@ -105,7 +147,7 @@ export const generateAndDownloadPartyStatementPDF = (
   doc.setTextColor(15, 23, 42);
   doc.setFontSize(11);
   doc.setFont('helvetica', 'bold');
-  doc.text(party.name || 'N/A', 18, 46);
+  doc.text(sanitizedName, 18, 46);
 
   if (party.code) {
     doc.setFontSize(7.5);
@@ -119,12 +161,12 @@ export const generateAndDownloadPartyStatementPDF = (
   doc.setFont('helvetica', 'normal');
   doc.setTextColor(51, 65, 85);
   doc.text(`Mobile: ${party.mobile || 'N/A'}`, 100, 42);
-  doc.text(`Address: ${party.address || 'Surat, Gujarat'}`, 100, 47);
+  doc.text(`Address: ${sanitizedAddress}`, 100, 47);
   if (party.gstin) {
     doc.text(`GSTIN: ${party.gstin}`, 100, 52);
   }
 
-  // Type Tag
+  // Type Tag Badge
   doc.setFillColor(isCustomer ? 240 : 239, isCustomer ? 253 : 246, isCustomer ? 244 : 255);
   doc.roundedRect(158, 38, 34, 6, 1, 1, 'F');
   doc.setTextColor(isCustomer ? 21 : 30, isCustomer ? 128 : 64, isCustomer ? 61 : 175);
@@ -132,7 +174,7 @@ export const generateAndDownloadPartyStatementPDF = (
   doc.setFont('helvetica', 'bold');
   doc.text(isCustomer ? 'CUSTOMER KHATA' : 'SUPPLIER KHATA', 175, 42.5, { align: 'center' });
 
-  // 3. FINANCIAL METRICS TILES
+  // 3. FINANCIAL METRICS TILES (Clean Numbers - NO superscript '¹')
   const startYTiles = 60;
   const tileWidth = 43.5;
   const tileGap = 2.6;
@@ -148,7 +190,7 @@ export const generateAndDownloadPartyStatementPDF = (
   doc.text('OPENING BALANCE', 18, startYTiles + 4.5);
   doc.setTextColor(51, 65, 85);
   doc.setFontSize(9.5);
-  doc.text(formatCurrency(reportData.opening_balance), 18, startYTiles + 10.5);
+  doc.text(formatPdfNumBold(reportData.opening_balance), 18, startYTiles + 10.5);
 
   // Total Debit Tile
   doc.setFillColor(239, 246, 255);
@@ -160,7 +202,7 @@ export const generateAndDownloadPartyStatementPDF = (
   doc.setFont('helvetica', 'bold');
   doc.text('TOTAL DEBIT (+ INVOICE)', 18 + tileWidth + tileGap, startYTiles + 4.5);
   doc.setFontSize(9.5);
-  doc.text(`+${formatCurrency(reportData.total_debit)}`, 18 + tileWidth + tileGap, startYTiles + 10.5);
+  doc.text(`+ ${formatPdfNumBold(reportData.total_debit)}`, 18 + tileWidth + tileGap, startYTiles + 10.5);
 
   // Total Credit Tile
   doc.setFillColor(240, 253, 244);
@@ -172,7 +214,7 @@ export const generateAndDownloadPartyStatementPDF = (
   doc.setFont('helvetica', 'bold');
   doc.text('TOTAL CREDIT (- PAYMENT)', 18 + (tileWidth + tileGap) * 2, startYTiles + 4.5);
   doc.setFontSize(9.5);
-  doc.text(`-${formatCurrency(reportData.total_credit)}`, 18 + (tileWidth + tileGap) * 2, startYTiles + 10.5);
+  doc.text(`- ${formatPdfNumBold(reportData.total_credit)}`, 18 + (tileWidth + tileGap) * 2, startYTiles + 10.5);
 
   // Net Closing Balance Tile
   const isClosingDue = reportData.closing_balance > 0;
@@ -185,22 +227,22 @@ export const generateAndDownloadPartyStatementPDF = (
   doc.setFont('helvetica', 'bold');
   doc.text(isCustomer ? (isClosingDue ? 'NET DUE (RECEIVABLE)' : 'ADVANCE / CLEARED') : (isClosingDue ? 'NET PAYABLE' : 'CLEARED'), 18 + (tileWidth + tileGap) * 3, startYTiles + 4.5);
   doc.setFontSize(10);
-  doc.text(`${formatCurrency(Math.abs(reportData.closing_balance))} ${reportData.closing_balance > 0 ? 'Dr' : 'Cr'}`, 18 + (tileWidth + tileGap) * 3, startYTiles + 10.5);
+  doc.text(`${formatPdfNumBold(Math.abs(reportData.closing_balance))} ${reportData.closing_balance > 0 ? 'Dr' : 'Cr'}`, 18 + (tileWidth + tileGap) * 3, startYTiles + 10.5);
 
-  // 4. LEDGER ENTRIES TABLE
+  // 4. LEDGER ENTRIES TABLE (Wide, Non-Overlapping Columns)
   const tableRows: any[] = [];
 
   // Opening balance row
   if (reportData.opening_balance !== 0) {
     tableRows.push([
       '-',
-      formatDate(startDate),
+      formatDatePdf(startDate),
       'OPENING',
       '-',
-      'Opening Balance b/f (Beginning Balance)',
-      reportData.opening_balance > 0 ? formatCurrency(reportData.opening_balance) : '-',
-      reportData.opening_balance < 0 ? formatCurrency(Math.abs(reportData.opening_balance)) : '-',
-      `${formatCurrency(Math.abs(reportData.opening_balance))} ${reportData.opening_balance > 0 ? 'Dr' : 'Cr'}`
+      'Beginning Opening Balance',
+      reportData.opening_balance > 0 ? formatPdfNumBold(reportData.opening_balance) : '-',
+      reportData.opening_balance < 0 ? formatPdfNumBold(Math.abs(reportData.opening_balance)) : '-',
+      `${formatPdfNumBold(Math.abs(reportData.opening_balance))} ${reportData.opening_balance > 0 ? 'Dr' : 'Cr'}`
     ]);
   }
 
@@ -208,24 +250,25 @@ export const generateAndDownloadPartyStatementPDF = (
     const isDebit = Number(e.debit_amount) > 0;
     const isCredit = Number(e.credit_amount) > 0;
 
-    let typeStr = e.voucher_type;
+    let typeStr = e.voucher_type || 'VOUCHER';
     if (e.voucher_type === 'SALE') typeStr = 'SALE INVOICE';
     else if (e.voucher_type === 'PAYMENT_RECEIVED' || e.voucher_type === 'PAYMENT_IN') typeStr = 'PAYMENT IN (JAMAA)';
     else if (e.voucher_type === 'PAYMENT_MADE' || e.voucher_type === 'PAYMENT_OUT') typeStr = 'PAYMENT OUT (UDHAR)';
-    else if (e.voucher_type === 'SALES_RETURN' || e.voucher_type === 'CREDIT_NOTE') typeStr = 'CREDIT NOTE (SALE RETURN)';
-    else if (e.voucher_type === 'PURCHASE_RETURN' || e.voucher_type === 'DEBIT_NOTE') typeStr = 'DEBIT NOTE (PURCHASE RETURN)';
-    else if (e.voucher_type === 'VASAN_CHARGE') typeStr = 'VASAN PENALTY';
+    else if (e.voucher_type === 'SALES_RETURN' || e.voucher_type === 'CREDIT_NOTE') typeStr = 'CREDIT NOTE (RETURN)';
+    else if (e.voucher_type === 'PURCHASE_RETURN' || e.voucher_type === 'DEBIT_NOTE') typeStr = 'DEBIT NOTE (RETURN)';
     else if (e.voucher_type === 'PURCHASE') typeStr = 'PURCHASE BILL';
+
+    const cleanNotes = sanitizePdfText(e.notes) || '-';
 
     tableRows.push([
       idx + 1,
-      formatDate(e.entry_date),
+      formatDatePdf(e.entry_date),
       typeStr,
       e.voucher_no || '-',
-      e.notes || '-',
-      isDebit ? formatCurrency(e.debit_amount) : '-',
-      isCredit ? formatCurrency(e.credit_amount) : '-',
-      `${formatCurrency(Math.abs(e.running_balance))} ${e.running_balance > 0 ? 'Dr' : 'Cr'}`
+      cleanNotes,
+      isDebit ? formatPdfNumBold(e.debit_amount) : '-',
+      isCredit ? formatPdfNumBold(e.credit_amount) : '-',
+      `${formatPdfNumBold(Math.abs(e.running_balance))} ${e.running_balance > 0 ? 'Dr' : 'Cr'}`
     ]);
   });
 
@@ -235,10 +278,10 @@ export const generateAndDownloadPartyStatementPDF = (
     '',
     'TOTAL',
     '',
-    `Total Activity (${formatDate(startDate)} to ${formatDate(endDate)})`,
-    formatCurrency(reportData.total_debit),
-    formatCurrency(reportData.total_credit),
-    `${formatCurrency(Math.abs(reportData.closing_balance))} ${reportData.closing_balance > 0 ? 'Dr' : 'Cr'}`
+    `Total Activity (${formatDatePdf(startDate)} to ${formatDatePdf(endDate)})`,
+    formatPdfNumBold(reportData.total_debit),
+    formatPdfNumBold(reportData.total_credit),
+    `${formatPdfNumBold(Math.abs(reportData.closing_balance))} ${reportData.closing_balance > 0 ? 'Dr' : 'Cr'}`
   ]);
 
   autoTable(doc, {
@@ -255,14 +298,14 @@ export const generateAndDownloadPartyStatementPDF = (
       cellPadding: 2.5
     },
     columnStyles: {
-      0: { halign: 'center', cellWidth: 8 },
+      0: { halign: 'center', cellWidth: 10 },
       1: { cellWidth: 20 },
-      2: { cellWidth: 26, fontStyle: 'bold' },
-      3: { cellWidth: 24, fontStyle: 'bold' },
+      2: { cellWidth: 28, fontStyle: 'bold' },
+      3: { cellWidth: 26, fontStyle: 'bold' },
       4: { cellWidth: 'auto' },
-      5: { halign: 'right', cellWidth: 22, textColor: [30, 64, 175] },
-      6: { halign: 'right', cellWidth: 22, textColor: [21, 128, 61] },
-      7: { halign: 'right', cellWidth: 24, fontStyle: 'bold' }
+      5: { halign: 'right', cellWidth: 26, textColor: [30, 64, 175] },
+      6: { halign: 'right', cellWidth: 26, textColor: [21, 128, 61] },
+      7: { halign: 'right', cellWidth: 28, fontStyle: 'bold' }
     },
     styles: {
       fontSize: 7.5,
@@ -287,7 +330,6 @@ export const generateAndDownloadPartyStatementPDF = (
   const finalY = (doc as any).lastAutoTable.finalY || 240;
   const sigY = Math.min(finalY + 14, 265);
 
-  // If table ran too close to bottom, add a new page
   if (sigY > 260) {
     doc.addPage();
   }
@@ -297,7 +339,7 @@ export const generateAndDownloadPartyStatementPDF = (
   doc.setDrawColor(148, 163, 184);
   doc.setLineDashPattern([1.5, 1.5], 0);
   doc.line(20, effectiveSigY + 12, 70, effectiveSigY + 12);
-  doc.setLineDashPattern([], 0); // reset dash
+  doc.setLineDashPattern([], 0);
 
   doc.setFontSize(7.5);
   doc.setFont('helvetica', 'bold');
@@ -353,18 +395,18 @@ export const createWhatsAppStatementShareLink = (
 
   const isClosingDue = reportData.closing_balance > 0;
   const balanceText = isClosingDue 
-    ? `*Net Balance Due:* ${formatCurrency(Math.abs(reportData.closing_balance))} (To Collect)`
-    : `*Account Status:* Settled / Advance (${formatCurrency(Math.abs(reportData.closing_balance))})`;
+    ? `*Net Balance Due:* Rs. ${formatPdfNumBold(Math.abs(reportData.closing_balance))} (To Collect)`
+    : `*Account Status:* Settled / Advance (Rs. ${formatPdfNumBold(Math.abs(reportData.closing_balance))})`;
 
   const message = [
     `*MATUKI SWEETS - STATEMENT OF ACCOUNT*`,
     `=============================`,
     `*Party:* ${party.name}`,
-    `*Period:* ${formatDate(startDate)} to ${formatDate(endDate)}`,
+    `*Period:* ${formatDatePdf(startDate)} to ${formatDatePdf(endDate)}`,
     `-----------------------------`,
-    `*Opening Balance:* ${formatCurrency(reportData.opening_balance)}`,
-    `*Total Debits (Invoices):* +${formatCurrency(reportData.total_debit)}`,
-    `*Total Credits (Payments/Returns):* -${formatCurrency(reportData.total_credit)}`,
+    `*Opening Balance:* Rs. ${formatPdfNumBold(reportData.opening_balance)}`,
+    `*Total Debits (Invoices):* + Rs. ${formatPdfNumBold(reportData.total_debit)}`,
+    `*Total Credits (Payments/Returns):* - Rs. ${formatPdfNumBold(reportData.total_credit)}`,
     `-----------------------------`,
     balanceText,
     `=============================`,
