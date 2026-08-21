@@ -646,10 +646,19 @@ export const partyService = {
     // Sort entries chronologically
     allEntries.sort((a, b) => (a.entry_date || '').localeCompare(b.entry_date || ''));
 
-    // 3. Opening balance = party's stored opening balance plus every entry strictly
-    // before this statement's startDate (keeps the statement in sync with the party's
-    // current_balance shown elsewhere, which is computed the same way).
-    let openingBalance = Number(party.opening_balance || 0);
+    // 3. Compute base opening balance at start of all transactions so that
+    // final net closing balance equals party.opening_balance (the current balance).
+    const netAllEntriesActivity = allEntries.reduce((sum, e) => {
+      if (partyType === 'CUSTOMER') {
+        return sum + (Number(e.debit_amount || 0) - Number(e.credit_amount || 0));
+      } else {
+        return sum + (Number(e.credit_amount || 0) - Number(e.debit_amount || 0));
+      }
+    }, 0);
+
+    const baseOpeningBalance = Number(party.opening_balance || 0) - netAllEntriesActivity;
+
+    let openingBalance = baseOpeningBalance;
     let periodEntries = allEntries;
 
     if (startDate) {
