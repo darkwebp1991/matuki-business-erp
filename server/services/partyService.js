@@ -16,9 +16,14 @@ export const partyService = {
     const existingCust = db.prepare('SELECT id FROM customers WHERE LOWER(TRIM(name)) = LOWER(TRIM(?))').get(trimmedName);
     if (existingCust) return existingCust.id;
 
-    // 2. Check if exists in suppliers table (do not duplicate pure suppliers)
-    const existingSupp = db.prepare('SELECT id FROM suppliers WHERE LOWER(TRIM(name)) = LOWER(TRIM(?))').get(trimmedName);
-    if (existingSupp) return null;
+    // 2. Check if exists in suppliers table to grab mobile if needed
+    let finalMobile = (mobile || '').trim();
+    if (!finalMobile) {
+      const existingSupp = db.prepare('SELECT mobile FROM suppliers WHERE LOWER(TRIM(name)) = LOWER(TRIM(?))').get(trimmedName);
+      if (existingSupp && existingSupp.mobile) {
+        finalMobile = existingSupp.mobile;
+      }
+    }
 
     // 3. Auto-create customer in customers master table!
     try {
