@@ -79,6 +79,9 @@ export interface TodoItem {
   description?: string;
   user_id?: number | null;
   assigned_to_name: string;
+  assigned_by_name?: string;
+  assignment_status?: 'ACCEPTED' | 'PENDING_ASSIGNMENT' | 'REJECTED';
+  rejection_reason?: string;
   due_date: string;
   due_time?: string;
   priority: 'HIGH' | 'MEDIUM' | 'LOW';

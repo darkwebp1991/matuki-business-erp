@@ -656,6 +656,9 @@ CREATE TABLE IF NOT EXISTS todos (
   description TEXT DEFAULT '',
   user_id INTEGER REFERENCES users(id),
   assigned_to_name TEXT DEFAULT 'Admin',
+  assigned_by_name TEXT DEFAULT 'Admin',
+  assignment_status TEXT DEFAULT 'ACCEPTED', -- ACCEPTED, PENDING_ASSIGNMENT, REJECTED
+  rejection_reason TEXT DEFAULT '',
   due_date DATE NOT NULL,
   due_time TEXT DEFAULT '',
   priority TEXT NOT NULL DEFAULT 'MEDIUM', -- HIGH, MEDIUM, LOW

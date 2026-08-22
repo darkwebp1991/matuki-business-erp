@@ -1,5 +1,26 @@
 import { getDatabase } from '../database/connection.js';
 
+let isMigrated = false;
+
+function ensureTodoSchemaMigration(db) {
+  if (isMigrated) return;
+  try {
+    const cols = db.prepare("PRAGMA table_info('todos')").all().map(c => c.name);
+    if (!cols.includes('assigned_by_name')) {
+      db.prepare("ALTER TABLE todos ADD COLUMN assigned_by_name TEXT DEFAULT 'Admin'").run();
+    }
+    if (!cols.includes('assignment_status')) {
+      db.prepare("ALTER TABLE todos ADD COLUMN assignment_status TEXT DEFAULT 'ACCEPTED'").run();
+    }
+    if (!cols.includes('rejection_reason')) {
+      db.prepare("ALTER TABLE todos ADD COLUMN rejection_reason TEXT DEFAULT ''").run();
+    }
+    isMigrated = true;
+  } catch (e) {
+    console.error('Todo schema migration error:', e.message);
+  }
+}
+
 function extractTimeFromText(text) {
   if (!text) return '';
   const match = text.match(/\b(\d{1,2})(?::(\d{2}))?\s*(am|pm)\b/i);
@@ -14,9 +35,11 @@ function extractTimeFromText(text) {
 }
 
 export const todoService = {
-  // Get todos with filters and smart auto-elevation for overdue/yesterday tasks
+  // Get todos with user-wise isolation, assignment status, and timeframe filtering
   getTodos(filters = {}) {
     const db = getDatabase();
+    ensureTodoSchemaMigration(db);
+
     let query = 'SELECT * FROM todos WHERE 1=1';
     const params = [];
 
@@ -24,6 +47,35 @@ export const todoService = {
     const tomorrow = new Date();
     tomorrow.setDate(tomorrow.getDate() + 1);
     const tomorrowStr = tomorrow.toISOString().split('T')[0];
+
+    // 1. View Mode Isolation (MY_TASKS, PENDING_REQUESTS, ASSIGNED_BY_ME)
+    const activeUsername = filters.currentUser ? (filters.currentUser.full_name || filters.currentUser.username || '').trim() : (filters.username || '').trim();
+
+    if (filters.viewMode === 'PENDING_REQUESTS') {
+      // Incoming tasks assigned to current user waiting for Accept/Reject
+      if (activeUsername) {
+        query += ` AND (LOWER(TRIM(assigned_to_name)) = LOWER(TRIM(?)) OR user_id = ?) AND assignment_status = 'PENDING_ASSIGNMENT'`;
+        params.push(activeUsername, filters.userId || -1);
+      } else {
+        query += ` AND assignment_status = 'PENDING_ASSIGNMENT'`;
+      }
+    } else if (filters.viewMode === 'ASSIGNED_BY_ME') {
+      // Tasks created/assigned by current user to someone else
+      if (activeUsername) {
+        query += ` AND (LOWER(TRIM(assigned_by_name)) = LOWER(TRIM(?)) OR LOWER(TRIM(created_by)) = LOWER(TRIM(?))) AND LOWER(TRIM(assigned_to_name)) != LOWER(TRIM(?))`;
+        params.push(activeUsername, activeUsername, activeUsername);
+      } else {
+        query += ` AND LOWER(TRIM(assigned_by_name)) != LOWER(TRIM(assigned_to_name))`;
+      }
+    } else {
+      // Default MY_TASKS mode: Only accepted tasks assigned to current user
+      if (activeUsername && activeUsername !== 'ALL' && activeUsername !== 'All') {
+        query += ` AND (LOWER(TRIM(assigned_to_name)) = LOWER(TRIM(?)) OR user_id = ?) AND (assignment_status IS NULL OR assignment_status = 'ACCEPTED')`;
+        params.push(activeUsername, filters.userId || -1);
+      } else {
+        query += ` AND (assignment_status IS NULL OR assignment_status = 'ACCEPTED')`;
+      }
+    }
 
     // Timeframe filtering
     if (filters.timeframe === 'TODAY' || filters.timeframe === 'MY_DAY') {
@@ -56,28 +108,21 @@ export const todoService = {
       params.push(filters.status);
     }
 
-    // User filter
-    if (filters.userId) {
-      query += ' AND user_id = ?';
-      params.push(filters.userId);
-    } else if (filters.assignedToName && filters.assignedToName !== 'ALL' && filters.assignedToName !== 'All') {
-      query += ' AND (assigned_to_name = ? OR user_id = ?)';
-      params.push(filters.assignedToName, filters.assignedToName);
-    }
-
     // Search query
     if (filters.search) {
-      query += ' AND (title LIKE ? OR description LIKE ?)';
-      params.push(`%${filters.search}%`, `%${filters.search}%`);
+      query += ' AND (title LIKE ? OR description LIKE ? OR assigned_by_name LIKE ? OR assigned_to_name LIKE ?)';
+      const s = `%${filters.search}%`;
+      params.push(s, s, s, s);
     }
 
-    // Smart Ordering (Microsoft To-Do Pattern):
-    // 1. Pending before Completed
-    // 2. Overdue / Yesterday's pending items FIRST with top urgency!
-    // 3. Starred / Important items next
-    // 4. High Priority next
-    // 5. Time & Due Date
+    // Smart Ordering:
+    // 1. Pending Assignment Requests first (if in view mode)
+    // 2. Pending before Completed
+    // 3. Overdue items
+    // 4. Starred items
+    // 5. High Priority
     query += ` ORDER BY 
+      CASE WHEN assignment_status = 'PENDING_ASSIGNMENT' THEN 0 ELSE 1 END ASC,
       CASE WHEN status = 'COMPLETED' THEN 1 ELSE 0 END ASC,
       CASE WHEN (due_date < ? AND status != 'COMPLETED') THEN 0 ELSE 1 END ASC,
       CASE WHEN is_starred = 1 THEN 0 ELSE 1 END ASC,
@@ -93,7 +138,6 @@ export const todoService = {
 
     const rows = db.prepare(query).all(...params);
 
-    // Annotate rows with is_overdue flag & parse subtasks
     return rows.map(r => ({
       ...r,
       is_overdue: (r.due_date < todayStr && r.status !== 'COMPLETED') ? 1 : 0,
@@ -104,6 +148,7 @@ export const todoService = {
   // Get single todo by ID
   getTodoById(id) {
     const db = getDatabase();
+    ensureTodoSchemaMigration(db);
     const row = db.prepare('SELECT * FROM todos WHERE id = ?').get(id);
     if (!row) return null;
     const todayStr = new Date().toISOString().split('T')[0];
@@ -114,9 +159,11 @@ export const todoService = {
     };
   },
 
-  // Create new task (Super-fast inline or modal)
+  // Create new task with User Assignment & Status Logic
   createTodo(data, username = 'Admin') {
     const db = getDatabase();
+    ensureTodoSchemaMigration(db);
+
     if (!data.title || !data.title.trim()) {
       throw new Error('Task title is required');
     }
@@ -124,7 +171,23 @@ export const todoService = {
     const title = data.title.trim();
     const description = data.description || '';
     const userId = data.user_id ? Number(data.user_id) : null;
-    const assignedToName = data.assigned_to_name || username || 'Admin';
+    
+    // Creator name & Assignee name
+    const assignedByName = (data.assigned_by_name || username || 'Admin').trim();
+    const assignedToName = (data.assigned_to_name || username || 'Admin').trim();
+
+    // Assignment status logic:
+    // If assigned to another user -> PENDING_ASSIGNMENT (Requires Accept/Reject)
+    // If assigned to self -> ACCEPTED
+    let assignmentStatus = data.assignment_status;
+    if (!assignmentStatus) {
+      if (assignedToName.toLowerCase() !== assignedByName.toLowerCase()) {
+        assignmentStatus = 'PENDING_ASSIGNMENT';
+      } else {
+        assignmentStatus = 'ACCEPTED';
+      }
+    }
+
     const dueDate = data.due_date || new Date().toISOString().split('T')[0];
     const dueTime = (data.due_time || '').trim() || extractTimeFromText(title) || extractTimeFromText(description);
     const priority = data.priority || 'MEDIUM';
@@ -137,22 +200,70 @@ export const todoService = {
 
     const stmt = db.prepare(`
       INSERT INTO todos (
-        title, description, user_id, assigned_to_name, due_date, due_time,
+        title, description, user_id, assigned_to_name, assigned_by_name, assignment_status, rejection_reason, due_date, due_time,
         priority, status, is_recurring, recurring_frequency, is_starred, list_category, subtasks_json, created_by
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, '', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     const result = stmt.run(
-      title, description, userId, assignedToName, dueDate, dueTime,
+      title, description, userId, assignedToName, assignedByName, assignmentStatus, dueDate, dueTime,
       priority, status, isRecurring, recurringFrequency, isStarred, listCategory, subtasksJson, username
     );
 
     return this.getTodoById(result.lastInsertRowid);
   },
 
+  // Accept Task Assignment
+  acceptTodo(id, username = 'Admin') {
+    const db = getDatabase();
+    ensureTodoSchemaMigration(db);
+    const existing = this.getTodoById(id);
+    if (!existing) throw new Error('Task not found');
+
+    db.prepare(`
+      UPDATE todos
+      SET assignment_status = 'ACCEPTED', updated_at = CURRENT_TIMESTAMP
+      WHERE id = ?
+    `).run(id);
+
+    return this.getTodoById(id);
+  },
+
+  // Reject Task Assignment with optional reason
+  rejectTodo(id, reason = '', username = 'Admin') {
+    const db = getDatabase();
+    ensureTodoSchemaMigration(db);
+    const existing = this.getTodoById(id);
+    if (!existing) throw new Error('Task not found');
+
+    const cleanReason = (reason || 'Rejected by user').trim();
+
+    db.prepare(`
+      UPDATE todos
+      SET assignment_status = 'REJECTED', rejection_reason = ?, updated_at = CURRENT_TIMESTAMP
+      WHERE id = ?
+    `).run(cleanReason, id);
+
+    return this.getTodoById(id);
+  },
+
+  // Get Pending Request Count for notification badge
+  getPendingRequestsCount(username) {
+    const db = getDatabase();
+    ensureTodoSchemaMigration(db);
+    if (!username) return 0;
+    const row = db.prepare(`
+      SELECT COUNT(*) as count FROM todos
+      WHERE LOWER(TRIM(assigned_to_name)) = LOWER(TRIM(?))
+        AND assignment_status = 'PENDING_ASSIGNMENT'
+    `).get(username);
+    return row ? row.count : 0;
+  },
+
   // Update existing task
   updateTodo(id, data) {
     const db = getDatabase();
+    ensureTodoSchemaMigration(db);
     const existing = this.getTodoById(id);
     if (!existing) throw new Error('Task not found');
 
@@ -160,6 +271,9 @@ export const todoService = {
     const description = data.description !== undefined ? data.description : existing.description;
     const userId = data.user_id !== undefined ? (data.user_id ? Number(data.user_id) : null) : existing.user_id;
     const assignedToName = data.assigned_to_name !== undefined ? data.assigned_to_name : existing.assigned_to_name;
+    const assignedByName = data.assigned_by_name !== undefined ? data.assigned_by_name : (existing.assigned_by_name || 'Admin');
+    const assignmentStatus = data.assignment_status !== undefined ? data.assignment_status : (existing.assignment_status || 'ACCEPTED');
+    const rejectionReason = data.rejection_reason !== undefined ? data.rejection_reason : (existing.rejection_reason || '');
     const dueDate = data.due_date !== undefined ? data.due_date : existing.due_date;
     const dueTime = data.due_time !== undefined ? data.due_time : existing.due_time;
     const priority = data.priority !== undefined ? data.priority : existing.priority;
@@ -173,12 +287,16 @@ export const todoService = {
 
     db.prepare(`
       UPDATE todos
-      SET title = ?, description = ?, user_id = ?, assigned_to_name = ?, due_date = ?, due_time = ?,
-          priority = ?, status = ?, is_recurring = ?, recurring_frequency = ?, is_starred = ?, list_category = ?, subtasks_json = ?, completed_at = ?, updated_at = CURRENT_TIMESTAMP
+      SET title = ?, description = ?, user_id = ?, assigned_to_name = ?, assigned_by_name = ?,
+          assignment_status = ?, rejection_reason = ?, due_date = ?, due_time = ?,
+          priority = ?, status = ?, is_recurring = ?, recurring_frequency = ?, is_starred = ?,
+          list_category = ?, subtasks_json = ?, completed_at = ?, updated_at = CURRENT_TIMESTAMP
       WHERE id = ?
     `).run(
-      title, description, userId, assignedToName, dueDate, dueTime,
-      priority, status, isRecurring, recurringFrequency, isStarred, listCategory, subtasksJson, completedAt, id
+      title, description, userId, assignedToName, assignedByName,
+      assignmentStatus, rejectionReason, dueDate, dueTime,
+      priority, status, isRecurring, recurringFrequency, isStarred,
+      listCategory, subtasksJson, completedAt, id
     );
 
     return this.getTodoById(id);
@@ -187,6 +305,7 @@ export const todoService = {
   // 1-Click Toggle completion status
   toggleTodoStatus(id) {
     const db = getDatabase();
+    ensureTodoSchemaMigration(db);
     const existing = this.getTodoById(id);
     if (!existing) throw new Error('Task not found');
 
@@ -205,6 +324,7 @@ export const todoService = {
   // 1-Click Star / Important Toggle
   toggleStar(id) {
     const db = getDatabase();
+    ensureTodoSchemaMigration(db);
     const existing = this.getTodoById(id);
     if (!existing) throw new Error('Task not found');
 
@@ -218,9 +338,10 @@ export const todoService = {
     return this.getTodoById(id);
   },
 
-  // 1-Click Reschedule overdue task to Today with HIGH priority (Auto-Elevate)
+  // 1-Click Reschedule overdue task to Today
   rescheduleToToday(id) {
     const db = getDatabase();
+    ensureTodoSchemaMigration(db);
     const todayStr = new Date().toISOString().split('T')[0];
     db.prepare(`
       UPDATE todos
@@ -230,9 +351,10 @@ export const todoService = {
     return this.getTodoById(id);
   },
 
-  // 1-Click Reschedule ALL overdue tasks to Today with HIGH priority
+  // 1-Click Reschedule ALL overdue tasks to Today
   rescheduleAllOverdueToToday(userId = null) {
     const db = getDatabase();
+    ensureTodoSchemaMigration(db);
     const todayStr = new Date().toISOString().split('T')[0];
     let query = `
       UPDATE todos
@@ -251,24 +373,27 @@ export const todoService = {
   // Delete task
   deleteTodo(id) {
     const db = getDatabase();
+    ensureTodoSchemaMigration(db);
     db.prepare('DELETE FROM todos WHERE id = ?').run(id);
     return { success: true, message: 'Task deleted successfully' };
   },
 
   // Today Summary for Dashboard Widget and Productivity Reminders
-  getTodaySummary(userId = null) {
+  getTodaySummary(username = null) {
     const db = getDatabase();
+    ensureTodoSchemaMigration(db);
     const todayStr = new Date().toISOString().split('T')[0];
 
     let query = `
       SELECT * FROM todos 
       WHERE (due_date = ? OR (due_date < ? AND status != 'COMPLETED'))
+        AND (assignment_status IS NULL OR assignment_status = 'ACCEPTED')
     `;
     const params = [todayStr, todayStr];
 
-    if (userId) {
-      query += ' AND (user_id = ? OR user_id IS NULL)';
-      params.push(userId);
+    if (username) {
+      query += ' AND (LOWER(TRIM(assigned_to_name)) = LOWER(TRIM(?)) OR user_id IS NULL)';
+      params.push(username);
     }
 
     query += ` ORDER BY 
@@ -284,7 +409,6 @@ export const todoService = {
     const pending = total - completed;
     const percentage = total > 0 ? Math.round((completed / total) * 100) : 100;
     
-    // Separate overdue tasks
     const overdueTasks = allTasks.filter(t => t.due_date < todayStr && t.status !== 'COMPLETED').map(t => ({
       ...t,
       is_overdue: 1
@@ -322,7 +446,7 @@ export const todoService = {
 
   // WhatsApp Group Share Formatter
   generateWhatsAppBriefingText(timeframe = 'TODAY', assignedTo = 'All') {
-    const todos = this.getTodos({ timeframe: timeframe, assignedToName: assignedTo === 'All' ? null : assignedTo });
+    const todos = this.getTodos({ timeframe: timeframe, username: assignedTo === 'All' ? null : assignedTo });
     const todayStr = new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'short', year: 'numeric' });
     
     let text = `📋 *MATUKI SWEETS & SNACKS — DAILY WORK BRIEFING*\n`;

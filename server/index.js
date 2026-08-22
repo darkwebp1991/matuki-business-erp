@@ -1150,17 +1150,25 @@ const server = http.createServer(async (req, res) => {
     if (pathname === '/api/todos' && method === 'GET') {
       const todos = todoService.getTodos({
         timeframe: query.timeframe,
+        viewMode: query.view_mode || query.viewMode,
         userId: query.user_id ? Number(query.user_id) : null,
+        username: query.username || query.assigned_to,
         assignedToName: query.assigned_to,
+        category: query.category,
         status: query.status,
         search: query.search
       });
       return sendJson(res, 200, { success: true, data: todos });
     }
     if (pathname === '/api/todos/summary' && method === 'GET') {
-      const userId = query.user_id ? Number(query.user_id) : null;
-      const summary = todoService.getTodaySummary(userId);
+      const username = query.username || query.assigned_to;
+      const summary = todoService.getTodaySummary(username);
       return sendJson(res, 200, { success: true, data: summary });
+    }
+    if (pathname === '/api/todos/pending-count' && method === 'GET') {
+      const username = query.username || query.assigned_to || 'Admin';
+      const count = todoService.getPendingRequestsCount(username);
+      return sendJson(res, 200, { success: true, data: { count } });
     }
     if (pathname === '/api/todos/whatsapp-briefing' && method === 'GET') {
       const briefingText = todoService.generateWhatsAppBriefingText(query.timeframe || 'TODAY', query.assigned_to || 'All');
@@ -1168,9 +1176,25 @@ const server = http.createServer(async (req, res) => {
     }
     if (pathname === '/api/todos' && method === 'POST') {
       const body = await parseBody(req);
-      const created = todoService.createTodo(body, body.username || 'Admin');
+      const created = todoService.createTodo(body, body.username || body.assigned_by_name || 'Admin');
       eventService.emit({ type: 'DATA_CHANGED', module: 'todos' });
       return sendJson(res, 201, { success: true, data: created });
+    }
+    if (pathname.match(/^\/api\/todos\/(\d+)\/accept$/) && (method === 'POST' || method === 'PATCH')) {
+      const match = pathname.match(/^\/api\/todos\/(\d+)\/accept$/);
+      const id = match ? match[1] : null;
+      const body = await parseBody(req);
+      const updated = todoService.acceptTodo(Number(id), body.username || 'Admin');
+      eventService.emit({ type: 'DATA_CHANGED', module: 'todos' });
+      return sendJson(res, 200, { success: true, data: updated });
+    }
+    if (pathname.match(/^\/api\/todos\/(\d+)\/reject$/) && (method === 'POST' || method === 'PATCH')) {
+      const match = pathname.match(/^\/api\/todos\/(\d+)\/reject$/);
+      const id = match ? match[1] : null;
+      const body = await parseBody(req);
+      const updated = todoService.rejectTodo(Number(id), body.reason || body.rejection_reason, body.username || 'Admin');
+      eventService.emit({ type: 'DATA_CHANGED', module: 'todos' });
+      return sendJson(res, 200, { success: true, data: updated });
     }
     if (pathname.startsWith('/api/todos/') && pathname.endsWith('/toggle') && (method === 'PATCH' || method === 'POST')) {
       const id = pathname.split('/')[3];

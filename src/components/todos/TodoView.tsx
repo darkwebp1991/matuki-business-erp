@@ -56,12 +56,18 @@ const PRESET_CATEGORIES = [
 export const TodoView: React.FC<TodoViewProps> = ({ currentUser, settings }) => {
   const [todos, setTodos] = useState<TodoItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [viewMode, setViewMode] = useState<'MY_TASKS' | 'PENDING_REQUESTS' | 'ASSIGNED_BY_ME'>('MY_TASKS');
+  const [pendingCount, setPendingCount] = useState<number>(0);
   const [activeSmartList, setActiveSmartList] = useState<SmartListKey>('MY_DAY');
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
   const [selectedUserFilter, setSelectedUserFilter] = useState<string>('All');
   const [users, setUsers] = useState<User[]>([]);
   const [search, setSearch] = useState('');
   
+  // Rejection modal state
+  const [rejectModalTask, setRejectModalTask] = useState<TodoItem | null>(null);
+  const [rejectReasonInput, setRejectReasonInput] = useState<string>('');
+
   // Right Drawers State (Suggestions vs Task Details)
   const [showSuggestionsDrawer, setShowSuggestionsDrawer] = useState(false);
   const [selectedTaskForDetail, setSelectedTaskForDetail] = useState<TodoItem | null>(null);
@@ -91,11 +97,26 @@ export const TodoView: React.FC<TodoViewProps> = ({ currentUser, settings }) => 
   // Real-time AI NLP Intent Parser
   const aiIntent = parseTaskIntent(quickTitle);
 
+  const activeUsername = currentUser?.full_name || currentUser?.username || 'Admin';
+
+  const fetchPendingCount = async () => {
+    try {
+      const res = await api.getPendingTodoCount(activeUsername);
+      setPendingCount(res.count || 0);
+    } catch (e) {
+      console.error('Error fetching pending todo count:', e);
+    }
+  };
+
   const fetchTodos = async (isSilent = false) => {
     try {
       if (!isSilent) setLoading(true);
+      fetchPendingCount();
+
       const params: any = {
-        assigned_to: selectedUserFilter === 'All' ? undefined : selectedUserFilter,
+        view_mode: viewMode,
+        username: activeUsername,
+        assigned_to: selectedUserFilter === 'All' ? activeUsername : selectedUserFilter,
         search: search.trim() || undefined
       };
 
@@ -131,7 +152,7 @@ export const TodoView: React.FC<TodoViewProps> = ({ currentUser, settings }) => 
 
   useEffect(() => {
     fetchTodos();
-  }, [activeSmartList, activeCategory, selectedUserFilter, search]);
+  }, [viewMode, activeSmartList, activeCategory, selectedUserFilter, search]);
 
   // Real-Time Live Server-Sent Events (SSE) Auto-Sync
   useEffect(() => {
@@ -143,7 +164,7 @@ export const TodoView: React.FC<TodoViewProps> = ({ currentUser, settings }) => 
     return () => {
       if (unsubscribe && typeof unsubscribe === 'function') unsubscribe();
     };
-  }, [activeSmartList, activeCategory, selectedUserFilter, search]);
+  }, [viewMode, activeSmartList, activeCategory, selectedUserFilter, search]);
 
   // Click outside to close popovers
   useEffect(() => {
@@ -349,7 +370,43 @@ export const TodoView: React.FC<TodoViewProps> = ({ currentUser, settings }) => 
       playNotificationChime('EXACT_TIME');
       fetchTodos();
     } catch (err) {
-      console.error('Failed to reschedule overdue tasks:', err);
+      console.error('Failed to reschedule all overdue tasks:', err);
+    }
+  };
+
+  // User Accept Task Assignment
+  const handleAcceptTask = async (id: number, e?: React.MouseEvent) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    try {
+      playNotificationChime('COMPLETED');
+      await api.acceptTodo(id, activeUsername);
+      fetchTodos();
+    } catch (err) {
+      console.error('Failed to accept task:', err);
+    }
+  };
+
+  const handleOpenRejectModal = (task: TodoItem, e?: React.MouseEvent) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    setRejectModalTask(task);
+    setRejectReasonInput('');
+  };
+
+  const handleConfirmReject = async () => {
+    if (!rejectModalTask) return;
+    try {
+      await api.rejectTodo(rejectModalTask.id, rejectReasonInput.trim() || 'Task rejected', activeUsername);
+      setRejectModalTask(null);
+      setRejectReasonInput('');
+      fetchTodos();
+    } catch (err) {
+      console.error('Failed to reject task:', err);
     }
   };
 
@@ -503,6 +560,87 @@ export const TodoView: React.FC<TodoViewProps> = ({ currentUser, settings }) => 
                 {currentUser?.role || 'Admin'}
               </div>
             </div>
+          </div>
+
+          {/* User Task Mode Selector */}
+          <div style={{ padding: '6px 4px 8px 4px', borderBottom: '1px solid #f1f5f9', display: 'flex', flexDirection: 'column', gap: '3px' }}>
+            <div style={{ fontSize: '0.64rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', paddingLeft: '4px', marginBottom: '2px' }}>
+              Task Workspaces
+            </div>
+            
+            {/* My Active Tasks */}
+            <button
+              onClick={() => { setViewMode('MY_TASKS'); setActiveCategory(null); }}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                padding: '6px 8px',
+                borderRadius: '6px',
+                border: 'none',
+                background: viewMode === 'MY_TASKS' ? '#2563eb' : '#f8fafc',
+                color: viewMode === 'MY_TASKS' ? '#ffffff' : '#334155',
+                fontWeight: viewMode === 'MY_TASKS' ? 800 : 600,
+                fontSize: '0.78rem',
+                cursor: 'pointer'
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <span>👤</span>
+                <span>My Active Tasks</span>
+              </div>
+            </button>
+
+            {/* Pending Requests */}
+            <button
+              onClick={() => { setViewMode('PENDING_REQUESTS'); setActiveCategory(null); }}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                padding: '6px 8px',
+                borderRadius: '6px',
+                border: 'none',
+                background: viewMode === 'PENDING_REQUESTS' ? '#d97706' : pendingCount > 0 ? '#fffbe6' : '#f8fafc',
+                color: viewMode === 'PENDING_REQUESTS' ? '#ffffff' : pendingCount > 0 ? '#b45309' : '#334155',
+                fontWeight: viewMode === 'PENDING_REQUESTS' || pendingCount > 0 ? 800 : 600,
+                fontSize: '0.78rem',
+                cursor: 'pointer'
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <span>📥</span>
+                <span>Pending Requests</span>
+              </div>
+              {pendingCount > 0 && (
+                <span style={{ fontSize: '0.64rem', background: '#dc2626', color: '#ffffff', padding: '1px 6px', borderRadius: '10px', fontWeight: 900 }}>
+                  {pendingCount}
+                </span>
+              )}
+            </button>
+
+            {/* Assigned by Me */}
+            <button
+              onClick={() => { setViewMode('ASSIGNED_BY_ME'); setActiveCategory(null); }}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                padding: '6px 8px',
+                borderRadius: '6px',
+                border: 'none',
+                background: viewMode === 'ASSIGNED_BY_ME' ? '#4f46e5' : '#f8fafc',
+                color: viewMode === 'ASSIGNED_BY_ME' ? '#ffffff' : '#334155',
+                fontWeight: viewMode === 'ASSIGNED_BY_ME' ? 800 : 600,
+                fontSize: '0.78rem',
+                cursor: 'pointer'
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <span>📤</span>
+                <span>Assigned by Me</span>
+              </div>
+            </button>
           </div>
 
           {/* Smart Lists */}
@@ -878,24 +1016,147 @@ export const TodoView: React.FC<TodoViewProps> = ({ currentUser, settings }) => 
             <div style={{ padding: '30px', textAlign: 'center', color: '#64748b', fontSize: '0.82rem' }}>
               Loading tasks...
             </div>
-          ) : todos.length === 0 ? (
-            <div style={{
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              justifyContent: 'center',
-              height: '60%',
-              color: '#94a3b8',
-              textAlign: 'center'
-            }}>
-              <span style={{ fontSize: '2.5rem' }}>☀️</span>
-              <h3 style={{ fontSize: '1rem', fontWeight: 800, color: '#334155', margin: '8px 0 4px 0' }}>
-                Focus on your day
-              </h3>
-              <p style={{ fontSize: '0.76rem', margin: 0, maxWidth: '280px' }}>
-                Type in Gujarati/English (e.g. <em>"Hiyan caterer payment at 4pm"</em>) and press Enter. AI will auto-detect operational category, time, and priority!
-              </p>
-            </div>
+          ) : viewMode === 'PENDING_REQUESTS' ? (
+            todos.length === 0 ? (
+              <div style={{ padding: '50px 20px', textAlign: 'center', color: '#64748b' }}>
+                <span style={{ fontSize: '2.2rem' }}>🎉</span>
+                <h3 style={{ fontSize: '1rem', fontWeight: 800, color: '#334155', margin: '8px 0 4px 0' }}>
+                  No pending task assignment requests!
+                </h3>
+                <p style={{ fontSize: '0.76rem', color: '#94a3b8' }}>
+                  When your partner or team assigns a task to you, it will appear here for your review and acceptance.
+                </p>
+              </div>
+            ) : (
+              todos.map(task => (
+                <div
+                  key={task.id}
+                  style={{
+                    background: '#fffbe6',
+                    border: '1.5px solid #ffe58f',
+                    borderRadius: '10px',
+                    padding: '12px 14px',
+                    marginBottom: '8px',
+                    boxShadow: '0 2px 8px rgba(217, 119, 6, 0.08)'
+                  }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                    <span style={{ fontSize: '0.74rem', fontWeight: 800, color: '#b45309', background: '#fef3c7', padding: '2px 8px', borderRadius: '12px' }}>
+                      📥 Assigned by <strong>{task.assigned_by_name || 'Partner'}</strong>
+                    </span>
+                    <span style={{ fontSize: '0.7rem', color: '#78350f', fontWeight: 700 }}>
+                      📅 Due: {formatDate(task.due_date)} {task.due_time && `• ⏰ ${task.due_time}`}
+                    </span>
+                  </div>
+
+                  <div style={{ fontSize: '0.95rem', fontWeight: 900, color: '#0f172a' }}>{task.title}</div>
+                  {task.description && <div style={{ fontSize: '0.82rem', color: '#475569', marginTop: '4px' }}>{task.description}</div>}
+
+                  <div style={{ marginTop: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <button
+                      type="button"
+                      onClick={(e) => handleAcceptTask(task.id, e)}
+                      style={{
+                        background: '#16a34a',
+                        color: '#ffffff',
+                        border: 'none',
+                        borderRadius: '6px',
+                        padding: '6px 14px',
+                        fontSize: '0.78rem',
+                        fontWeight: 900,
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '4px',
+                        boxShadow: '0 2px 4px rgba(22, 163, 74, 0.2)'
+                      }}
+                    >
+                      ✓ Accept & Add to My List
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={(e) => handleOpenRejectModal(task, e)}
+                      style={{
+                        background: '#dc2626',
+                        color: '#ffffff',
+                        border: 'none',
+                        borderRadius: '6px',
+                        padding: '6px 14px',
+                        fontSize: '0.78rem',
+                        fontWeight: 900,
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '4px'
+                      }}
+                    >
+                      ✕ Reject Task
+                    </button>
+                  </div>
+                </div>
+              ))
+            )
+          ) : viewMode === 'ASSIGNED_BY_ME' ? (
+            todos.length === 0 ? (
+              <div style={{ padding: '50px 20px', textAlign: 'center', color: '#64748b' }}>
+                <span style={{ fontSize: '2.2rem' }}>📤</span>
+                <h3 style={{ fontSize: '1rem', fontWeight: 800, color: '#334155', margin: '8px 0 4px 0' }}>
+                  No tasks assigned to other members yet
+                </h3>
+                <p style={{ fontSize: '0.76rem', color: '#94a3b8' }}>
+                  Use the "+ Add Task" button or quick entry bar to assign tasks to your partner or staff members.
+                </p>
+              </div>
+            ) : (
+              todos.map(task => {
+                const isAccepted = task.assignment_status === 'ACCEPTED';
+                const isRejected = task.assignment_status === 'REJECTED';
+                const isPending = task.assignment_status === 'PENDING_ASSIGNMENT';
+                return (
+                  <div
+                    key={task.id}
+                    style={{
+                      background: isRejected ? '#fef2f2' : isPending ? '#fffbe6' : '#f0fdf4',
+                      border: isRejected ? '1.5px solid #fecaca' : isPending ? '1.5px solid #fef08a' : '1.5px solid #bbf7d0',
+                      borderRadius: '10px',
+                      padding: '12px 14px',
+                      marginBottom: '8px'
+                    }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                      <span style={{ fontSize: '0.74rem', fontWeight: 800, color: '#334155' }}>
+                        👤 Assigned to: <strong>{task.assigned_to_name}</strong>
+                      </span>
+                      <span style={{
+                        fontSize: '0.7rem',
+                        fontWeight: 900,
+                        padding: '2px 8px',
+                        borderRadius: '12px',
+                        background: isRejected ? '#dc2626' : isPending ? '#d97706' : '#16a34a',
+                        color: '#ffffff'
+                      }}>
+                        {isRejected ? '🔴 REJECTED' : isPending ? '🟡 PENDING APPROVAL' : '🟢 ACCEPTED & ACTIVE'}
+                      </span>
+                    </div>
+
+                    <div style={{ fontSize: '0.92rem', fontWeight: 800, color: '#0f172a' }}>{task.title}</div>
+                    {task.description && <div style={{ fontSize: '0.78rem', color: '#475569', marginTop: '2px' }}>{task.description}</div>}
+
+                    {isRejected && task.rejection_reason && (
+                      <div style={{ marginTop: '8px', background: '#fee2e2', color: '#991b1b', padding: '6px 10px', borderRadius: '6px', fontSize: '0.78rem', fontWeight: 700 }}>
+                        ❌ Rejection Reason: "{task.rejection_reason}"
+                      </div>
+                    )}
+
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.72rem', color: '#64748b', marginTop: '6px' }}>
+                      <span>📅 Due: {formatDate(task.due_date)} {task.due_time && `• ⏰ ${task.due_time}`}</span>
+                      <span>• Task Status: {task.status === 'COMPLETED' ? '✅ Completed' : '⏳ Pending'}</span>
+                    </div>
+                  </div>
+                );
+              })
+            )
           ) : (
             <>
               {/* Overdue / Yesterday Items (Do First) */}
@@ -1870,6 +2131,61 @@ export const TodoView: React.FC<TodoViewProps> = ({ currentUser, settings }) => 
             >
               <Trash2 size={12} />
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Rejection Reason Modal */}
+      {rejectModalTask && (
+        <div className="modal-overlay" style={{ zIndex: 1200 }}>
+          <div className="modal-content" style={{ maxWidth: '420px', padding: '16px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+              <h3 style={{ margin: 0, fontSize: '0.98rem', fontWeight: 900, color: '#dc2626' }}>
+                ✕ Reject Assigned Task
+              </h3>
+              <button
+                type="button"
+                onClick={() => setRejectModalTask(null)}
+                style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#64748b' }}
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div style={{ fontSize: '0.84rem', fontWeight: 700, color: '#0f172a', marginBottom: '8px' }}>
+              Task: "{rejectModalTask.title}"
+            </div>
+
+            <label style={{ fontSize: '0.74rem', fontWeight: 800, color: '#475569', display: 'block', marginBottom: '4px' }}>
+              Reason for Rejection (Optional):
+            </label>
+            <textarea
+              rows={3}
+              className="form-input"
+              placeholder="e.g. Busy in kitchen production / Out of office until 5 PM..."
+              value={rejectReasonInput}
+              onChange={e => setRejectReasonInput(e.target.value)}
+              autoFocus
+              style={{ fontSize: '0.8rem', width: '100%', marginBottom: '14px' }}
+            />
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+              <button
+                type="button"
+                className="btn btn-secondary btn-sm"
+                onClick={() => setRejectModalTask(null)}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="btn btn-danger btn-sm"
+                onClick={handleConfirmReject}
+                style={{ fontWeight: 900 }}
+              >
+                Confirm Reject
+              </button>
+            </div>
           </div>
         </div>
       )}

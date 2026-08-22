@@ -550,20 +550,31 @@ export const api = {
   }),
 
   // Daily To-Do Task Management & Productivity
-  getTodos: (params: { timeframe?: string; user_id?: number | null; assigned_to?: string; status?: string; search?: string } = {}) => {
+  getTodos: (params: { timeframe?: string; view_mode?: string; user_id?: number | null; assigned_to?: string; category?: string; status?: string; search?: string } = {}) => {
     const q = new URLSearchParams();
     if (params.timeframe) q.append('timeframe', params.timeframe);
+    if (params.view_mode) q.append('view_mode', params.view_mode);
     if (params.user_id) q.append('user_id', String(params.user_id));
     if (params.assigned_to) q.append('assigned_to', params.assigned_to);
+    if (params.category) q.append('category', params.category);
     if (params.status) q.append('status', params.status);
     if (params.search) q.append('search', params.search);
     return request<any[]>(`/todos?${q.toString()}`);
   },
-  getTodoSummary: (userId?: number | null) => request<any>(`/todos/summary${userId ? `?user_id=${userId}` : ''}`),
+  getTodoSummary: (user?: string | number | null) => request<any>(`/todos/summary${user ? `?assigned_to=${encodeURIComponent(String(user))}` : ''}`),
+  getPendingTodoCount: (username?: string) => request<{ count: number }>(`/todos/pending-count${username ? `?username=${encodeURIComponent(username)}` : ''}`),
   getTodoWhatsAppBriefing: (timeframe = 'TODAY', assignedTo = 'All') => request<{ text: string }>(`/todos/whatsapp-briefing?timeframe=${timeframe}&assigned_to=${encodeURIComponent(assignedTo)}`),
   createTodo: (data: any) => request<any>('/todos', {
     method: 'POST',
     body: JSON.stringify(data)
+  }),
+  acceptTodo: (id: number, username?: string) => request<any>(`/todos/${id}/accept`, {
+    method: 'POST',
+    body: JSON.stringify({ username })
+  }),
+  rejectTodo: (id: number, reason: string, username?: string) => request<any>(`/todos/${id}/reject`, {
+    method: 'POST',
+    body: JSON.stringify({ reason, username })
   }),
   updateTodo: (id: number, data: any) => request<any>(`/todos/${id}`, {
     method: 'PUT',
