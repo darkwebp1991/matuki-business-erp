@@ -850,7 +850,9 @@ export const AdvanceOrderModal: React.FC<AdvanceOrderModalProps> = ({
                         <div
                           key={`${p.party_type}_${p.id}`}
                           onClick={() => {
-                            setCustomerId(String(p.id));
+                            const matchingCust = customers.find(c => c.name.toLowerCase().trim() === p.name.toLowerCase().trim());
+                            const finalCustId = matchingCust ? String(matchingCust.id) : (p.party_type === 'CUSTOMER' ? String(p.id) : '');
+                            setCustomerId(finalCustId);
                             setCustomerName(p.name);
                             setCustomerMobile(p.mobile || '');
                             setCustomerBalance(p.current_balance || 0);
@@ -859,7 +861,12 @@ export const AdvanceOrderModal: React.FC<AdvanceOrderModalProps> = ({
                               setDeliveryAddress(p.address);
                             }
                             setIsPartyDropdownOpen(false);
-                            loadSmartRecommendations(p.id);
+                            if (finalCustId) {
+                              loadSmartRecommendations(Number(finalCustId));
+                            } else {
+                              setFrequentVenues([]);
+                              setFrequentProducts([]);
+                            }
                           }}
                           style={{
                             padding: '8px 12px',

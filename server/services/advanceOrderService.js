@@ -200,14 +200,37 @@ export const advanceOrderService = {
     // Generate Sequential Order Number
     const orderNo = data.order_no || settingsService.getNextDocumentNumber('ADVANCE_ORDER');
 
-    // Resolve Customer info
-    let customerName = data.customer_name || 'Walk-in Caterer';
-    let customerMobile = data.customer_mobile || '';
-    if (data.customer_id) {
-      const cust = db.prepare('SELECT name, mobile FROM customers WHERE id = ?').get(Number(data.customer_id));
+    // Resolve Customer info cleanly without mismatching supplier IDs with customer IDs
+    let customerName = (data.customer_name || 'Walk-in Caterer').trim();
+    let customerMobile = (data.customer_mobile || '').trim();
+    let customerId = data.customer_id ? Number(data.customer_id) : null;
+
+    if (customerId && customerName && customerName !== 'Walk-in Caterer') {
+      const cust = db.prepare('SELECT id, name, mobile FROM customers WHERE id = ?').get(customerId);
+      if (cust && cust.name.toLowerCase().trim() === customerName.toLowerCase()) {
+        customerName = cust.name;
+        if (!customerMobile) customerMobile = cust.mobile || '';
+      } else {
+        const matchCust = db.prepare('SELECT id, name, mobile FROM customers WHERE LOWER(TRIM(name)) = LOWER(TRIM(?))').get(customerName);
+        if (matchCust) {
+          customerId = matchCust.id;
+          customerName = matchCust.name;
+          if (!customerMobile) customerMobile = matchCust.mobile || '';
+        } else {
+          customerId = null;
+        }
+      }
+    } else if (customerId && (!customerName || customerName === 'Walk-in Caterer')) {
+      const cust = db.prepare('SELECT id, name, mobile FROM customers WHERE id = ?').get(customerId);
       if (cust) {
         customerName = cust.name;
         if (!customerMobile) customerMobile = cust.mobile || '';
+      }
+    } else if (customerName && customerName !== 'Walk-in Caterer' && !customerId) {
+      const matchCust = db.prepare('SELECT id, name, mobile FROM customers WHERE LOWER(TRIM(name)) = LOWER(TRIM(?))').get(customerName);
+      if (matchCust) {
+        customerId = matchCust.id;
+        if (!customerMobile) customerMobile = matchCust.mobile || '';
       }
     }
 
@@ -279,7 +302,7 @@ export const advanceOrderService = {
 
     const result = insertOrderStmt.run(
       orderNo,
-      data.customer_id ? Number(data.customer_id) : null,
+      customerId,
       customerName,
       customerMobile,
       data.delivery_date || new Date().toISOString().split('T')[0],
@@ -330,13 +353,24 @@ export const advanceOrderService = {
     const existing = db.prepare('SELECT * FROM advance_orders WHERE id = ?').get(Number(id));
     if (!existing) throw new Error(`Advance order ID ${id} not found`);
 
-    let customerName = data.customer_name || existing.customer_name;
-    let customerMobile = data.customer_mobile || existing.customer_mobile;
-    if (data.customer_id && data.customer_id !== existing.customer_id) {
-      const cust = db.prepare('SELECT name, mobile FROM customers WHERE id = ?').get(Number(data.customer_id));
-      if (cust) {
+    let customerName = (data.customer_name || existing.customer_name || 'Walk-in Caterer').trim();
+    let customerMobile = (data.customer_mobile || existing.customer_mobile || '').trim();
+    let customerId = data.customer_id !== undefined ? (data.customer_id ? Number(data.customer_id) : null) : existing.customer_id;
+
+    if (customerId && customerName) {
+      const cust = db.prepare('SELECT id, name, mobile FROM customers WHERE id = ?').get(customerId);
+      if (cust && cust.name.toLowerCase().trim() === customerName.toLowerCase()) {
         customerName = cust.name;
         if (!customerMobile) customerMobile = cust.mobile || '';
+      } else {
+        const matchCust = db.prepare('SELECT id, name, mobile FROM customers WHERE LOWER(TRIM(name)) = LOWER(TRIM(?))').get(customerName);
+        if (matchCust) {
+          customerId = matchCust.id;
+          customerName = matchCust.name;
+          if (!customerMobile) customerMobile = matchCust.mobile || '';
+        } else {
+          customerId = null;
+        }
       }
     }
 
@@ -381,7 +415,7 @@ export const advanceOrderService = {
         updated_at = CURRENT_TIMESTAMP
       WHERE id = ?
     `).run(
-      data.customer_id ? Number(data.customer_id) : existing.customer_id,
+      customerId,
       customerName,
       customerMobile,
       data.delivery_date || existing.delivery_date,

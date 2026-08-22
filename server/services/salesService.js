@@ -245,13 +245,31 @@ export const salesService = {
       const totalPaid = Math.min(grandTotal, advanceAdjusted + currentPaid);
       const dueAmount = Math.max(0, grandTotal - totalPaid);
 
-      let customerId = data.customer_id || null;
-      let customerName = data.customer_name || 'Cash Walk-in Customer';
+      let customerId = data.customer_id ? Number(data.customer_id) : null;
+      let customerName = (data.customer_name || 'Cash Walk-in Customer').trim();
 
-      if (customerId) {
-        const cust = db.prepare('SELECT id, name, mobile, advance_balance FROM customers WHERE id = ?').get(customerId);
+      if (customerId && customerName && customerName !== 'Cash Walk-in Customer') {
+        const cust = db.prepare('SELECT id, name, mobile FROM customers WHERE id = ?').get(customerId);
+        if (cust && cust.name.toLowerCase().trim() === customerName.toLowerCase()) {
+          customerName = cust.name;
+        } else {
+          const matchCust = db.prepare('SELECT id, name, mobile FROM customers WHERE LOWER(TRIM(name)) = LOWER(TRIM(?))').get(customerName);
+          if (matchCust) {
+            customerId = matchCust.id;
+            customerName = matchCust.name;
+          } else {
+            customerId = null;
+          }
+        }
+      } else if (customerId && (!customerName || customerName === 'Cash Walk-in Customer')) {
+        const cust = db.prepare('SELECT id, name, mobile FROM customers WHERE id = ?').get(customerId);
         if (cust) {
           customerName = cust.name;
+        }
+      } else if (customerName && customerName !== 'Cash Walk-in Customer' && !customerId) {
+        const matchCust = db.prepare('SELECT id, name, mobile FROM customers WHERE LOWER(TRIM(name)) = LOWER(TRIM(?))').get(customerName);
+        if (matchCust) {
+          customerId = matchCust.id;
         }
       }
 

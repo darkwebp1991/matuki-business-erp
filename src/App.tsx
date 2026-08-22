@@ -515,6 +515,7 @@ export function App() {
           onSuccess={(newSale, shouldPrint = true) => {
             setIsQuickSaleOpen(false);
             setConvertingAdvanceOrder(null);
+            setActiveModule('dashboard');
             addToast('success', 'Sale invoice created successfully!');
             loadInitialData();
             const saleObj = (newSale as any)?.data || newSale;
@@ -536,6 +537,7 @@ export function App() {
           onClose={() => {
             setQuickPrintSaleId(null);
             setQuickAutoTriggerPrint(false);
+            setActiveModule('dashboard');
           }}
         />
       )}

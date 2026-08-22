@@ -478,6 +478,8 @@ export const DashboardOrderWidget: React.FC<DashboardOrderWidgetProps> = ({
             setEditingOrder(null);
           }}
           onSuccess={() => {
+            setIsOrderModalOpen(false);
+            setEditingOrder(null);
             fetchDailySummary(selectedDate);
           }}
         />
