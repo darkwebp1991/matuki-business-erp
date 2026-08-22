@@ -121,7 +121,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             onClick={() => {
               if (canAccessSettings) onOpenSettings();
             }}
-            title={canAccessSettings ? "Click to view company profile & settings" : "Matuki Sweets ERP"}
+            title={canAccessSettings ? "Click to view company profile & settings" : `${settings?.business_name || 'Matuki Sweets'} ERP`}
           >
             <span style={{ fontSize: '1rem' }}>🍬</span>
             <div>

@@ -112,7 +112,8 @@ export const TaskScreenshotModal: React.FC<TaskScreenshotModalProps> = ({
   // Open WhatsApp with text while user pastes image
   const handleShareWhatsApp = () => {
     handleCopyImage();
-    const waText = `📋 *MATUKI SWEETS — DAILY TASK BRIEFING*\n📅 ${todayStr}\n📊 Progress: ${completed}/${total} Tasks Done (${progressPct}%)\n\n*(Task Screenshot image copied to clipboard — press Ctrl+V in WhatsApp to send!)*`;
+    const bName = (settings?.business_name || 'MATUKI SWEETS').toUpperCase();
+    const waText = `📋 *${bName} — DAILY TASK BRIEFING*\n📅 ${todayStr}\n📊 Progress: ${completed}/${total} Tasks Done (${progressPct}%)\n\n*(Task Screenshot image copied to clipboard — press Ctrl+V in WhatsApp to send!)*`;
     window.open(`https://wa.me/?text=${encodeURIComponent(waText)}`, '_blank');
   };
 

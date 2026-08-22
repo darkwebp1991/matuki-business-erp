@@ -271,7 +271,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ settings: propSettings
   const handleDownloadPDFStatement = () => {
     if (!reportData || selectedReport !== 'party_statement') return;
     try {
-      generateAndDownloadPartyStatementPDF(reportData, startDate, endDate);
+      generateAndDownloadPartyStatementPDF(reportData, startDate, endDate, settings);
     } catch (e: any) {
       console.error('Error generating PDF statement:', e);
       alert('Failed to generate PDF statement: ' + (e.message || 'Unknown error'));
@@ -283,10 +283,10 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ settings: propSettings
     if (!reportData || selectedReport !== 'party_statement') return;
     try {
       // 1. Auto generate & download the statement PDF
-      generateAndDownloadPartyStatementPDF(reportData, startDate, endDate);
+      generateAndDownloadPartyStatementPDF(reportData, startDate, endDate, settings);
 
       // 2. Open WhatsApp Web / WhatsApp Mobile
-      const waUrl = createWhatsAppStatementShareLink(reportData, startDate, endDate);
+      const waUrl = createWhatsAppStatementShareLink(reportData, startDate, endDate, settings);
       window.open(waUrl, '_blank');
     } catch (e: any) {
       console.error('Error initiating WhatsApp share:', e);

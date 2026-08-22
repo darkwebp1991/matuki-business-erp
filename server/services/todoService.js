@@ -440,9 +440,13 @@ export const todoService = {
   // WhatsApp Group Share Formatter
   generateWhatsAppBriefingText(timeframe = 'TODAY', assignedTo = 'All') {
     const todos = this.getTodos({ timeframe: timeframe, username: assignedTo === 'All' ? null : assignedTo });
+    const db = getDatabase();
+    const settingsRow = db.prepare('SELECT business_name FROM settings LIMIT 1').get();
+    const businessName = (settingsRow?.business_name || 'MATUKI SWEETS').toUpperCase();
+
     const todayStr = new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'short', year: 'numeric' });
     
-    let text = `📋 *MATUKI SWEETS & SNACKS — DAILY WORK BRIEFING*\n`;
+    let text = `📋 *${businessName} — DAILY WORK BRIEFING*\n`;
     text += `📅 *Date:* ${todayStr}\n`;
     text += `👤 *Assignee:* ${assignedTo}\n`;
     text += `━━━━━━━━━━━━━━━━━━━━━\n\n`;

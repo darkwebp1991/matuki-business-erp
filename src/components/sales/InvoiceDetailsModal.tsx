@@ -32,6 +32,7 @@ interface InvoiceDetailsModalProps {
   isOpen: boolean;
   saleId: number | null;
   onClose: () => void;
+  settings?: any;
   onPrint?: (saleId: number) => void;
   onEdit?: (sale: Sale) => void;
   onDuplicate?: (sale: Sale) => void;
@@ -44,6 +45,7 @@ export const InvoiceDetailsModal: React.FC<InvoiceDetailsModalProps> = ({
   isOpen,
   saleId,
   onClose,
+  settings: propSettings,
   onPrint,
   onEdit,
   onDuplicate,
@@ -58,8 +60,10 @@ export const InvoiceDetailsModal: React.FC<InvoiceDetailsModalProps> = ({
   const [waGatewayStatus, setWaGatewayStatus] = useState<any>(null);
   const [waSending, setWaSending] = useState<boolean>(false);
   const [waSuccess, setWaSuccess] = useState<string>('');
+  const [settings, setSettings] = useState<any>(propSettings || null);
 
   useEffect(() => {
+    api.getSettings().then(setSettings).catch(console.error);
     api.getWhatsAppGatewayStatus().then(res => {
       setWaGatewayStatus((res as any)?.data || res);
     }).catch(() => {});
@@ -99,7 +103,9 @@ export const InvoiceDetailsModal: React.FC<InvoiceDetailsModalProps> = ({
       .map((it, idx) => `${idx + 1}. ${it.product_name} - ${it.quantity} ${it.unit} @ ₹${it.rate} = ₹${it.amount}`)
       .join('\n');
 
-    const message = `*🧾 MATUKI SWEETS - Sale Invoice*\n` +
+    const shopName = (settings?.business_name || 'MATUKI SWEETS').toUpperCase();
+
+    const message = `*🧾 ${shopName} - Sale Invoice*\n` +
       `*Invoice #:* ${sale.invoice_no}\n` +
       `*Date:* ${formatDate(sale.date)}\n` +
       `*Customer:* ${sale.customer_name}\n` +
@@ -109,7 +115,7 @@ export const InvoiceDetailsModal: React.FC<InvoiceDetailsModalProps> = ({
       `*Grand Total:* ₹${sale.grand_total}\n` +
       `*Paid Amount:* ₹${sale.paid_amount}\n` +
       `*Balance Due:* ₹${sale.due_amount}\n\n` +
-      `Thank you! *MATUKI SWEETS*`;
+      `Thank you! *${shopName}*`;
 
     if (waGatewayStatus?.isConnected && phone.length >= 10) {
       try {

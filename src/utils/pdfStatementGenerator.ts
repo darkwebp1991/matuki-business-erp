@@ -72,7 +72,8 @@ const formatDatePdf = (dateStr: string | null | undefined): string => {
 export const generateAndDownloadPartyStatementPDF = (
   reportData: StatementReportData,
   startDate: string,
-  endDate: string
+  endDate: string,
+  settings?: any
 ) => {
   const doc = new jsPDF({
     orientation: 'portrait',
@@ -87,24 +88,33 @@ export const generateAndDownloadPartyStatementPDF = (
   const sanitizedName = party.name || 'N/A';
   const sanitizedAddress = sanitizePdfText(party.address) || 'Surat, Gujarat';
 
+  // Dynamic Store Profile Settings
+  const bName = (settings?.business_name || 'MATUKI SWEETS').trim();
+  const bSubtitle = (settings?.subtitle || 'Catering Wholesale & Sweets Manufacturer').trim();
+  const bAddress = (settings?.address || 'Katargam, Surat, Gujarat').trim();
+  const bMobile = settings?.mobile ? ` | Phone: ${settings.mobile}` : '';
+  const logoText = (bName || 'MS').split(' ').map((w: string) => w[0]).join('').substring(0, 2).toUpperCase() || 'MS';
+
   // 1. BRAND HEADER (Top Bar)
   doc.setFillColor(211, 47, 47); // Crimson Red Logo Box
   doc.rect(14, 12, 12, 12, 'F');
   doc.setTextColor(255, 255, 255);
   doc.setFontSize(10);
   doc.setFont('helvetica', 'bold');
-  doc.text('MS', 20, 20, { align: 'center' });
+  doc.text(logoText, 20, 20, { align: 'center' });
 
   doc.setTextColor(15, 23, 42); // Dark Navy Header Text
-  doc.setFontSize(16);
+  doc.setFontSize(15);
   doc.setFont('helvetica', 'bold');
-  doc.text('MATUKI SWEETS', 30, 18);
+  doc.text(sanitizePdfText(bName).toUpperCase(), 30, 18);
 
   doc.setFontSize(8.5);
   doc.setFont('helvetica', 'normal');
   doc.setTextColor(71, 85, 105);
-  doc.text('Near Gajera Circle, Katargam, Surat, Gujarat - 395004 | Phone: +91 98251 23456', 30, 23);
-  doc.text('Catering Wholesale & Sweets Manufacturer (Shuddha Ghee & Mawa Sweets)', 30, 27);
+  doc.text(sanitizePdfText(`${bAddress}${bMobile}`), 30, 23);
+  if (bSubtitle) {
+    doc.text(sanitizePdfText(bSubtitle), 30, 27);
+  }
 
   // Statement Badge (Right Top)
   doc.setFillColor(15, 23, 42);
@@ -350,7 +360,7 @@ export const generateAndDownloadPartyStatementPDF = (
   doc.setTextColor(15, 23, 42);
   doc.setFontSize(8);
   doc.setFont('helvetica', 'bold');
-  doc.text('For, MATUKI SWEETS', 165, effectiveSigY + 4, { align: 'center' });
+  doc.text(`For, ${sanitizePdfText(bName).toUpperCase()}`, 165, effectiveSigY + 4, { align: 'center' });
 
   doc.setDrawColor(15, 23, 42);
   doc.line(140, effectiveSigY + 12, 190, effectiveSigY + 12);
@@ -366,7 +376,7 @@ export const generateAndDownloadPartyStatementPDF = (
     doc.setFontSize(6.5);
     doc.setTextColor(148, 163, 184);
     doc.text(
-      `Page ${i} of ${pageCount} | Computer Generated Statement | Matuki Business ERP`,
+      `Page ${i} of ${pageCount} | Computer Generated Statement | ${sanitizePdfText(bName)} ERP`,
       105,
       290,
       { align: 'center' }
@@ -382,12 +392,16 @@ export const generateAndDownloadPartyStatementPDF = (
 export const createWhatsAppStatementShareLink = (
   reportData: StatementReportData,
   startDate: string,
-  endDate: string
+  endDate: string,
+  settings?: any
 ): string => {
   const party = reportData.party || { name: 'Valued Customer' };
   const rawMobile = party.mobile || '';
   const cleanMobile = rawMobile.replace(/\D/g, '');
   const phoneParam = cleanMobile.length === 10 ? `91${cleanMobile}` : cleanMobile;
+
+  const bName = (settings?.business_name || 'MATUKI SWEETS').trim();
+  const bPhone = settings?.mobile ? ` at ${settings.mobile}` : '';
 
   const isClosingDue = reportData.closing_balance > 0;
   const balanceText = isClosingDue 
@@ -395,7 +409,7 @@ export const createWhatsAppStatementShareLink = (
     : `*Account Status:* Settled / Advance (Rs. ${formatPdfNumBold(Math.abs(reportData.closing_balance))})`;
 
   const message = [
-    `*MATUKI SWEETS - STATEMENT OF ACCOUNT*`,
+    `*${bName.toUpperCase()} - STATEMENT OF ACCOUNT*`,
     `=============================`,
     `*Party:* ${party.name}`,
     `*Period:* ${formatDatePdf(startDate)} to ${formatDatePdf(endDate)}`,
@@ -406,7 +420,7 @@ export const createWhatsAppStatementShareLink = (
     `-----------------------------`,
     balanceText,
     `=============================`,
-    `_Kindly review your account statement PDF. For any queries, contact Matuki Sweets at +91 98251 23456._`,
+    `_Kindly review your account statement PDF. For any queries, contact ${bName}${bPhone}._`,
     `_Thank you for your business!_`
   ].join('\n');
 

@@ -226,7 +226,7 @@ export const CustomerOrderPortal: React.FC<{ outletParam?: string }> = ({ outlet
       `💰 *Estimated Total*: ₹${submittedOrder.items.reduce((s: number, i: any) => s + i.amount, 0)}\n` +
       (submittedOrder.advance_amount > 0 ? `💵 *Advance Paid*: ₹${submittedOrder.advance_amount} (${submittedOrder.deposit_mode})\n` : '') +
       (submittedOrder.notes ? `📝 *Notes*: ${submittedOrder.notes}\n\n` : '\n') +
-      `_Thank you for choosing Matuki Sweets!_ 🙏`;
+      `_Thank you for choosing ${settings?.business_name || 'Matuki Sweets'}!_ 🙏`;
 
     window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank');
   };
@@ -437,11 +437,11 @@ export const CustomerOrderPortal: React.FC<{ outletParam?: string }> = ({ outlet
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <Store size={22} color="#fbbf24" />
               <h1 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 900, letterSpacing: '-0.3px' }}>
-                MATUKI SWEETS
+                {settings?.business_name || 'MATUKI SWEETS'}
               </h1>
             </div>
             <div style={{ fontSize: '0.74rem', opacity: 0.9, marginTop: '2px', color: '#fef08a' }}>
-              ✨ Online Advance Caterer & Party Booking Portal
+              ✨ Online Advance Caterer & Party Booking Portal ({settings?.subtitle || 'Shuddha Ghee & Mawa Sweets'})
             </div>
           </div>
 
