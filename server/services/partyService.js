@@ -42,21 +42,40 @@ export const partyService = {
   autoSyncAllMissingParties() {
     const db = getDatabase();
     try {
-      const query = `
+      // 1. Sync missing parties from advance_orders & sales into customers master table
+      const query1 = `
         SELECT DISTINCT party_name, party_mobile FROM (
           SELECT customer_name as party_name, customer_mobile as party_mobile FROM advance_orders WHERE customer_name IS NOT NULL AND TRIM(customer_name) != '' AND customer_name != 'Walk-in Caterer' AND customer_name != 'Cash Walk-in Customer'
           UNION
           SELECT customer_name as party_name, customer_mobile as party_mobile FROM sales WHERE customer_name IS NOT NULL AND TRIM(customer_name) != '' AND customer_name != 'Cash Walk-in Customer'
         )
         WHERE LOWER(TRIM(party_name)) NOT IN (SELECT LOWER(TRIM(name)) FROM customers)
-          AND LOWER(TRIM(party_name)) NOT IN (SELECT LOWER(TRIM(name)) FROM suppliers)
       `;
-      const missing = db.prepare(query).all();
-      for (const row of missing) {
+      const missing1 = db.prepare(query1).all();
+      for (const row of missing1) {
         const newCustId = partyService.ensureCustomerExists(row.party_name, row.party_mobile);
         if (newCustId) {
           db.prepare('UPDATE advance_orders SET customer_id = ? WHERE LOWER(TRIM(customer_name)) = LOWER(TRIM(?)) AND (customer_id IS NULL OR customer_id = 0)').run(newCustId, row.party_name);
           db.prepare('UPDATE sales SET customer_id = ? WHERE LOWER(TRIM(customer_name)) = LOWER(TRIM(?)) AND (customer_id IS NULL OR customer_id = 0)').run(newCustId, row.party_name);
+        }
+      }
+
+      // 2. Sync suppliers who have sales or advance orders into customers table
+      const query2 = `
+        SELECT s.id, s.name, s.mobile
+        FROM suppliers s
+        WHERE LOWER(TRIM(s.name)) NOT IN (SELECT LOWER(TRIM(name)) FROM customers)
+          AND (
+            EXISTS (SELECT 1 FROM sales WHERE customer_id = s.id OR LOWER(TRIM(customer_name)) = LOWER(TRIM(s.name)))
+            OR EXISTS (SELECT 1 FROM advance_orders WHERE customer_id = s.id OR LOWER(TRIM(customer_name)) = LOWER(TRIM(s.name)))
+          )
+      `;
+      const missingSuppliers = db.prepare(query2).all();
+      for (const s of missingSuppliers) {
+        const newCustId = partyService.ensureCustomerExists(s.name, s.mobile);
+        if (newCustId) {
+          db.prepare('UPDATE sales SET customer_id = ? WHERE LOWER(TRIM(customer_name)) = LOWER(TRIM(?)) OR customer_id = ?').run(newCustId, s.name, s.id);
+          db.prepare('UPDATE advance_orders SET customer_id = ? WHERE LOWER(TRIM(customer_name)) = LOWER(TRIM(?)) OR customer_id = ?').run(newCustId, s.name, s.id);
         }
       }
     } catch (err) {
