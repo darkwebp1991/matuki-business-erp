@@ -250,6 +250,7 @@ export const advanceOrderService = {
         }
       }
     }
+    let totalItems = 0;
     let totalWeightKg = 0;
     let totalAmount = 0;
 

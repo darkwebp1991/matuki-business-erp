@@ -27,6 +27,7 @@ import { Product, Customer, Driver, DeliveryLocation, AreaDeliveryRate, AdvanceO
 import { formatCurrency, formatDate } from '../../utils/formatters';
 import { CustomerModal } from '../parties/CustomerModal';
 import { VoiceSearchButton } from '../common/VoiceSearchButton';
+import { AddNewVenueModal } from '../common/AddNewVenueModal';
 
 interface NewSaleModalProps {
   isOpen: boolean;
@@ -88,6 +89,7 @@ export const NewSaleModal: React.FC<NewSaleModalProps> = ({
   const [deliveryVenue, setDeliveryVenue] = useState<string>('');
   const [deliveryAddress, setDeliveryAddress] = useState<string>('');
   const [googleMapLink, setGoogleMapLink] = useState<string>('');
+  const [isAddNewVenueOpen, setIsAddNewVenueOpen] = useState<boolean>(false);
   const venueSearchRef = useRef<HTMLDivElement>(null);
   
   // Rickshaw Driver (Selected for delivery dispatch)
@@ -1285,9 +1287,30 @@ export const NewSaleModal: React.FC<NewSaleModalProps> = ({
             }}>
               {/* Delivery Venue search (Surat 100+ Plots) */}
               <div ref={venueSearchRef} style={{ position: 'relative' }}>
-                <label style={{ fontSize: '0.72rem', fontWeight: 800, color: '#1e40af', display: 'block', marginBottom: '2px' }}>
-                  📍 Delivery Venue / Plot
-                </label>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2px' }}>
+                  <label style={{ fontSize: '0.72rem', fontWeight: 800, color: '#1e40af', margin: 0 }}>
+                    📍 Delivery Venue / Plot
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => setIsAddNewVenueOpen(true)}
+                    style={{
+                      fontSize: '0.68rem',
+                      fontWeight: 800,
+                      color: '#1d4ed8',
+                      background: '#eff6ff',
+                      border: '1px solid #bfdbfe',
+                      borderRadius: '4px',
+                      padding: '0 6px',
+                      cursor: 'pointer',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '2px'
+                    }}
+                  >
+                    <Plus size={10} /> + New Venue
+                  </button>
+                </div>
                 <input
                   type="text"
                   className="form-input"
@@ -1302,7 +1325,7 @@ export const NewSaleModal: React.FC<NewSaleModalProps> = ({
                     matchAndApplyArea(e.target.value);
                   }}
                 />
-                {isVenueDropdownOpen && locations.length > 0 && (
+                {isVenueDropdownOpen && (
                   <div style={{
                     position: 'absolute',
                     top: '100%',
@@ -1317,6 +1340,27 @@ export const NewSaleModal: React.FC<NewSaleModalProps> = ({
                     zIndex: 999999,
                     marginTop: '2px'
                   }}>
+                    <div
+                      onClick={() => {
+                        setIsVenueDropdownOpen(false);
+                        setIsAddNewVenueOpen(true);
+                      }}
+                      style={{
+                        padding: '8px 10px',
+                        cursor: 'pointer',
+                        background: '#eff6ff',
+                        borderBottom: '1px solid #bfdbfe',
+                        fontSize: '0.78rem',
+                        fontWeight: 800,
+                        color: '#1d4ed8',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '4px'
+                      }}
+                    >
+                      <Plus size={12} /> Add &quot;{venueSearchQuery || 'New Venue'}&quot; to Venue Master List
+                    </div>
+
                     {locations.filter(l => {
                       if (!venueSearchQuery) return true;
                       const q = venueSearchQuery.toLowerCase();
@@ -2142,6 +2186,17 @@ export const NewSaleModal: React.FC<NewSaleModalProps> = ({
           </div>
         </div>
       )}
+
+      {/* Add New Venue Modal */}
+      <AddNewVenueModal
+        isOpen={isAddNewVenueOpen}
+        initialVenueName={venueSearchQuery}
+        onClose={() => setIsAddNewVenueOpen(false)}
+        onSuccess={(newLoc) => {
+          setLocations(prev => [...prev, newLoc]);
+          handleSelectVenueLocation(newLoc);
+        }}
+      />
     </div>
   );
 };

@@ -260,34 +260,26 @@ export const reportService = {
     const prev2Data = calcMonthData(prevMonth2.start, prevMonth2.end);
     const selectedData = calcMonthData(sDate, eDate);
 
-    // Prior Year Benchmark simulation
+    // Prior Year benchmark: the same calendar period, one year earlier
+    // (e.g. if the live month is Aug 1-22 2026, this is Aug 1-22 2025), so
+    // it's an apples-to-apples comparison against the actual live column
+    // rather than a partial-vs-full-month mismatch. Computed with the exact
+    // same calcMonthData() used for every other column — this used to be a
+    // hardcoded "simulation" that multiplied the current month's own numbers
+    // by guessed ratios, with cash_profit/net_profit literally copying the
+    // current month's value unchanged and fixed percentages that never
+    // varied by period. Replaced with a real query against real history.
     const prevYearLabel = `${curMonth.label.slice(0, 3)}-${Number(curMonth.label.slice(4)) - 1}`;
-    const priorYearBenchmark = {
-      sales: Math.round((curData.sales > 0 ? curData.sales * 0.92 : 3709449) * 100) / 100,
-      direct_expense: Math.round((curData.direct_expense > 0 ? curData.direct_expense * 0.90 : 3078848) * 100) / 100,
-      direct_expense_pct: -82.99,
-      labour: Math.round((curData.labour > 0 ? curData.labour * 0.95 : 359079) * 100) / 100,
-      labour_pct: -9.68,
-      transportation: Math.round((curData.transportation > 0 ? curData.transportation * 0.95 : 43804) * 100) / 100,
-      transportation_pct: -1.18,
-      stock_addition: -142667,
-      stock_addition_pct: -3.85,
-      gross_profit: Math.round((curData.gross_profit > 0 ? curData.gross_profit * 0.90 : 85051) * 100) / 100,
-      gross_profit_pct: 2.29,
-      indirect_expense: Math.round((curData.indirect_expense > 0 ? curData.indirect_expense * 0.95 : 430160) * 100) / 100,
-      indirect_expense_pct: -11.6,
-      cash_profit: Math.round((curData.cash_profit || -345109) * 100) / 100,
-      cash_profit_pct: -9.3,
-      depreciation: Math.round((curData.depreciation || 130988) * 100) / 100,
-      depreciation_pct: -3.53,
-      net_profit: Math.round((curData.net_profit || -476097) * 100) / 100,
-      net_profit_pct: -12.83,
-      indirect_breakdown: []
-    };
+    const priorYearStart = `${Number(curMonth.start.slice(0, 4)) - 1}${curMonth.start.slice(4)}`;
+    const priorYearEnd = `${Number(curMonth.end.slice(0, 4)) - 1}${curMonth.end.slice(4)}`;
+    const priorYearBenchmark = calcMonthData(priorYearStart, priorYearEnd);
 
-    // Live Cash Flow Reconciliation Data
-    const cashInHand = db.prepare(`SELECT COALESCE(SUM(debit_amount) - SUM(credit_amount), 0) as val FROM ledger_entries WHERE party_type = 'CASH'`).get().val;
-    const bankBalance = db.prepare(`SELECT COALESCE(SUM(debit_amount) - SUM(credit_amount), 0) as val FROM ledger_entries WHERE party_type = 'BANK'`).get().val;
+    // Live Cash Flow Reconciliation Data.
+    // NOTE: ledger_entries never receives CASH/BANK party_type rows in this
+    // app (verified against live data), so a query against it always
+    // returned 0 here. Real cash/bank position is computed from
+    // sales/purchases/expenses/payments payment_mode instead.
+    const { cash: cashInHand, bank: bankBalance } = reportService._getRealCashAndBankBalance();
     const realCashBalance = Math.max(0, cashInHand + bankBalance);
 
     // Live Collections & Payments In for the selected period
@@ -753,37 +745,63 @@ export const reportService = {
 
   getTrialBalance() {
     const db = getDatabase();
-    const rows = db.prepare(`
-      SELECT 
-        party_type as account_head,
-        SUM(debit_amount) as total_debit,
-        SUM(credit_amount) as total_credit
-      FROM ledger_entries
-      GROUP BY party_type
-    `).all();
+    const val = (sql) => db.prepare(sql).get().val || 0;
+
+    // CUSTOMER and SUPPLIER turnover is read from sales/purchases/payments/
+    // returns directly rather than ledger_entries: customer PAYMENT_IN and
+    // (historically) supplier PURCHASE/PAYMENT_OUT rows are frequently
+    // missing a valid party_id in this database, which made a raw
+    // GROUP BY party_type over ledger_entries silently wrong (e.g. it always
+    // showed ₹0 supplier credit despite ₹5.8Cr+ in real purchases).
+    const customerDebit = val(`SELECT COALESCE(SUM(grand_total),0) as val FROM sales WHERE status='ACTIVE'`);
+    const customerCredit = val(`SELECT COALESCE(SUM(amount),0) as val FROM payments WHERE party_type='CUSTOMER'`)
+      + val(`SELECT COALESCE(SUM(total_amount),0) as val FROM sales_returns`);
+
+    const supplierCredit = val(`SELECT COALESCE(SUM(grand_total),0) as val FROM purchases WHERE status='ACTIVE'`);
+    const supplierDebit = val(`SELECT COALESCE(SUM(amount),0) as val FROM payments WHERE party_type='SUPPLIER'`)
+      + val(`SELECT COALESCE(SUM(total_amount),0) as val FROM purchase_returns`);
+
+    const expenseDebit = val(`SELECT COALESCE(SUM(amount),0) as val FROM expenses`);
+
+    const cashBankTurnover = reportService._getCashBankTurnover();
+
+    const rows = [
+      { account_head: 'CUSTOMER', total_debit: Math.round(customerDebit * 100) / 100, total_credit: Math.round(customerCredit * 100) / 100 },
+      { account_head: 'SUPPLIER', total_debit: Math.round(supplierDebit * 100) / 100, total_credit: Math.round(supplierCredit * 100) / 100 },
+      { account_head: 'CASH', total_debit: Math.round(cashBankTurnover.cashIn * 100) / 100, total_credit: Math.round(cashBankTurnover.cashOut * 100) / 100 },
+      { account_head: 'BANK', total_debit: Math.round(cashBankTurnover.bankIn * 100) / 100, total_credit: Math.round(cashBankTurnover.bankOut * 100) / 100 },
+      { account_head: 'EXPENSE', total_debit: Math.round(expenseDebit * 100) / 100, total_credit: 0 }
+    ];
 
     const totalDebit = rows.reduce((sum, r) => sum + r.total_debit, 0);
     const totalCredit = rows.reduce((sum, r) => sum + r.total_credit, 0);
 
-    return { total_debit: totalDebit, total_credit: totalCredit, accounts: rows };
+    return { total_debit: Math.round(totalDebit * 100) / 100, total_credit: Math.round(totalCredit * 100) / 100, accounts: rows };
   },
 
   getBalanceSheet() {
     const db = getDatabase();
     const inventory = inventoryService.getInventorySummary();
 
+    // customers.opening_balance / suppliers.opening_balance are kept live and
+    // already reflect every sale, purchase, and payment posted to date (see
+    // getPartyLedgerStatement, which treats this field as "the current
+    // balance"). Do NOT also add a ledger_entries delta on top of it here —
+    // that double-counts activity already baked into opening_balance, and
+    // since customer PAYMENT_IN rows are frequently missing a matching
+    // party_id, the delta is itself unreliable (verified: it was inflating
+    // Accounts Receivable by ~13x on live data).
     const receivables = db.prepare(`
-      SELECT COALESCE(SUM(c.opening_balance + COALESCE((SELECT SUM(debit_amount) - SUM(credit_amount) FROM ledger_entries WHERE party_type = 'CUSTOMER' AND party_id = c.id), 0)), 0) as val
+      SELECT COALESCE(SUM(c.opening_balance), 0) as val
       FROM customers c WHERE c.active = 1
     `).get().val;
 
     const payables = db.prepare(`
-      SELECT COALESCE(SUM(s.opening_balance + COALESCE((SELECT SUM(credit_amount) - SUM(debit_amount) FROM ledger_entries WHERE party_type = 'SUPPLIER' AND party_id = s.id), 0)), 0) as val
+      SELECT COALESCE(SUM(s.opening_balance), 0) as val
       FROM suppliers s WHERE s.active = 1
     `).get().val;
 
-    const cash = db.prepare(`SELECT COALESCE(SUM(debit_amount) - SUM(credit_amount), 0) as val FROM ledger_entries WHERE party_type = 'CASH'`).get().val;
-    const bank = db.prepare(`SELECT COALESCE(SUM(debit_amount) - SUM(credit_amount), 0) as val FROM ledger_entries WHERE party_type = 'BANK'`).get().val;
+    const { cash, bank } = reportService._getRealCashAndBankBalance();
 
     const totalAssets = inventory.total_valuation + Math.max(0, receivables) + Math.max(0, cash) + Math.max(0, bank);
     const totalLiabilities = Math.max(0, payables);
@@ -801,6 +819,48 @@ export const reportService = {
         capital_and_equity: Math.round((totalAssets - totalLiabilities) * 100) / 100,
         total: Math.round(totalAssets * 100) / 100
       }
+    };
+  },
+
+  // Raw cash-like / bank-like turnover (money in vs money out), computed from
+  // the tables that actually carry accurate payment_mode data (sales,
+  // purchases, expenses, payments) — instead of ledger_entries, which never
+  // receives CASH/BANK party_type rows in this app, so any query against it
+  // always returns 0.
+  _getCashBankTurnover() {
+    const db = getDatabase();
+    const BANK_MODES = "('BANK','NEFT','RTGS','CHEQUE','ONLINE')";
+    const val = (sql) => db.prepare(sql).get().val || 0;
+
+    const cashIn = val(`SELECT COALESCE(SUM(paid_amount),0) as val FROM sales WHERE status='ACTIVE' AND (payment_mode IS NULL OR payment_mode NOT IN ${BANK_MODES})`)
+      + val(`SELECT COALESCE(SUM(amount),0) as val FROM payments WHERE party_type='CUSTOMER' AND (payment_mode IS NULL OR payment_mode NOT IN ${BANK_MODES})`);
+    const cashOut = val(`SELECT COALESCE(SUM(paid_amount),0) as val FROM purchases WHERE status='ACTIVE' AND (payment_mode IS NULL OR payment_mode NOT IN ${BANK_MODES})`)
+      + val(`SELECT COALESCE(SUM(amount),0) as val FROM payments WHERE party_type='SUPPLIER' AND (payment_mode IS NULL OR payment_mode NOT IN ${BANK_MODES})`)
+      + val(`SELECT COALESCE(SUM(amount),0) as val FROM expenses WHERE (payment_mode IS NULL OR payment_mode NOT IN ${BANK_MODES})`);
+
+    const bankIn = val(`SELECT COALESCE(SUM(paid_amount),0) as val FROM sales WHERE status='ACTIVE' AND payment_mode IN ${BANK_MODES}`)
+      + val(`SELECT COALESCE(SUM(amount),0) as val FROM payments WHERE party_type='CUSTOMER' AND payment_mode IN ${BANK_MODES}`);
+    const bankOut = val(`SELECT COALESCE(SUM(paid_amount),0) as val FROM purchases WHERE status='ACTIVE' AND payment_mode IN ${BANK_MODES}`)
+      + val(`SELECT COALESCE(SUM(amount),0) as val FROM payments WHERE party_type='SUPPLIER' AND payment_mode IN ${BANK_MODES}`)
+      + val(`SELECT COALESCE(SUM(amount),0) as val FROM expenses WHERE payment_mode IN ${BANK_MODES}`);
+
+    return { cashIn, cashOut, bankIn, bankOut };
+  },
+
+  // Real cash-in-hand / bank position: configured opening balances plus
+  // real turnover since.
+  _getRealCashAndBankBalance() {
+    const db = getDatabase();
+    const val = (sql) => db.prepare(sql).get().val || 0;
+
+    const cashOpening = val(`SELECT COALESCE(SUM(opening_balance),0) as val FROM payment_accounts WHERE active=1 AND account_type != 'BANK'`);
+    const bankOpening = val(`SELECT COALESCE(SUM(opening_balance),0) as val FROM payment_accounts WHERE active=1 AND account_type = 'BANK'`);
+
+    const t = reportService._getCashBankTurnover();
+
+    return {
+      cash: Math.round((cashOpening + t.cashIn - t.cashOut) * 100) / 100,
+      bank: Math.round((bankOpening + t.bankIn - t.bankOut) * 100) / 100
     };
   },
 

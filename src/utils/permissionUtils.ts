@@ -34,11 +34,20 @@ export function getModuleAccessLevel(user: User | null | undefined, moduleId: st
   if (raw === 'VIEW') return 'VIEW';
   if (raw === 'NONE' || raw === false) return 'NONE';
 
+  // Every role gets FULL access to their own Daily Task Planner (todos) and at
+  // least VIEW on the dashboard, regardless of role — a user should never be
+  // locked out of every module just because their role has no explicit rule.
+  if (moduleId === 'todos') return 'FULL';
+
   // Fallbacks by role if not explicitly set
   if (user.role === 'MANAGER') return moduleId === 'settings' || moduleId === 'backup' ? 'NONE' : 'FULL';
   if (user.role === 'STOREKEEPER') return ['products', 'purchases', 'google_sheet_pnl', 'dashboard', 'advance_orders', 'attendance'].includes(moduleId) ? 'VIEW' : 'NONE';
   if (user.role === 'PRODUCTION') return ['products', 'advance_orders', 'google_sheet_pnl', 'dashboard', 'attendance'].includes(moduleId) ? 'VIEW' : 'NONE';
   if (user.role === 'CASHIER') return ['sales', 'advance_orders'].includes(moduleId) ? 'FULL' : ['customers'].includes(moduleId) ? 'EDIT' : ['dashboard', 'products', 'rojmel', 'expenses', 'attendance'].includes(moduleId) ? 'VIEW' : 'NONE';
+  if (user.role === 'ACCOUNTANT') return ['reports', 'rojmel', 'expenses', 'customers', 'suppliers'].includes(moduleId) ? 'FULL' : ['dashboard', 'purchases', 'sales'].includes(moduleId) ? 'VIEW' : 'NONE';
+  if (user.role === 'DELIVERY_STAFF') return ['advance_orders'].includes(moduleId) ? 'EDIT' : moduleId === 'dashboard' ? 'VIEW' : 'NONE';
+  if (user.role === 'CHEF') return ['products', 'advance_orders'].includes(moduleId) ? 'VIEW' : moduleId === 'dashboard' ? 'VIEW' : 'NONE';
+  if (user.role === 'STAFF') return moduleId === 'dashboard' || moduleId === 'attendance' ? 'VIEW' : 'NONE';
 
   return 'NONE';
 }

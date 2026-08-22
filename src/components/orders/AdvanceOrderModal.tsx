@@ -25,6 +25,7 @@ import { api } from '../../api/client';
 import { Product, Customer, Driver, DeliveryLocation, AreaDeliveryRate, AdvanceOrder, DailyOrdersSummary } from '../../types';
 import { formatCurrency, formatDate } from '../../utils/formatters';
 import { ChefProductionPrintModal } from './ChefProductionPrintModal';
+import { AddNewVenueModal } from '../common/AddNewVenueModal';
 
 interface AdvanceOrderModalProps {
   isOpen: boolean;
@@ -103,6 +104,7 @@ export const AdvanceOrderModal: React.FC<AdvanceOrderModalProps> = ({
   const [isVenueDropdownOpen, setIsVenueDropdownOpen] = useState<boolean>(false);
   const [deliveryVenue, setDeliveryVenue] = useState<string>('');
   const [deliveryAddress, setDeliveryAddress] = useState<string>('');
+  const [isAddNewVenueOpen, setIsAddNewVenueOpen] = useState<boolean>(false);
   const venueSearchRef = useRef<HTMLDivElement>(null);
 
   // Rickshaw Driver & Financials
@@ -940,7 +942,25 @@ export const AdvanceOrderModal: React.FC<AdvanceOrderModalProps> = ({
               <div ref={venueSearchRef} style={{ position: 'relative' }}>
                 <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.74rem', fontWeight: 800, color: '#1e40af', marginBottom: '3px' }}>
                   <span><MapPin size={12} style={{ verticalAlign: 'middle' }} /> Delivery Venue / Area</span>
-                  <span style={{ fontSize: '0.68rem', color: '#64748b', fontWeight: 600 }}>100+ Surat Locations</span>
+                  <button
+                    type="button"
+                    onClick={() => setIsAddNewVenueOpen(true)}
+                    style={{
+                      fontSize: '0.70rem',
+                      fontWeight: 800,
+                      color: '#1d4ed8',
+                      background: '#eff6ff',
+                      border: '1px solid #bfdbfe',
+                      borderRadius: '4px',
+                      padding: '1px 7px',
+                      cursor: 'pointer',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '3px'
+                    }}
+                  >
+                    <Plus size={11} /> Add New Venue
+                  </button>
                 </label>
                 <div style={{ position: 'relative' }}>
                   <input
@@ -960,13 +980,13 @@ export const AdvanceOrderModal: React.FC<AdvanceOrderModalProps> = ({
                   <ChevronDown size={14} color="#94a3b8" style={{ position: 'absolute', right: '8px', top: '9px', pointerEvents: 'none' }} />
                 </div>
 
-                {isVenueDropdownOpen && filteredLocations.length > 0 && (
+                {isVenueDropdownOpen && (
                   <div style={{
                     position: 'absolute',
                     top: '100%',
                     left: 0,
                     right: 0,
-                    maxHeight: '200px',
+                    maxHeight: '220px',
                     overflowY: 'auto',
                     background: '#ffffff',
                     border: '1.5px solid #3b82f6',
@@ -975,6 +995,28 @@ export const AdvanceOrderModal: React.FC<AdvanceOrderModalProps> = ({
                     zIndex: 1000,
                     marginTop: '3px'
                   }}>
+                    {/* + Add New Venue Option at top */}
+                    <div
+                      onClick={() => {
+                        setIsVenueDropdownOpen(false);
+                        setIsAddNewVenueOpen(true);
+                      }}
+                      style={{
+                        padding: '8px 12px',
+                        cursor: 'pointer',
+                        background: '#eff6ff',
+                        borderBottom: '1px solid #bfdbfe',
+                        fontSize: '0.82rem',
+                        fontWeight: 800,
+                        color: '#1d4ed8',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px'
+                      }}
+                    >
+                      <Plus size={14} /> Add &quot;{venueSearchQuery || 'New Venue'}&quot; to Venue Master List
+                    </div>
+
                     {filteredLocations.map(loc => (
                       <div
                         key={loc.id}
@@ -1837,6 +1879,17 @@ export const AdvanceOrderModal: React.FC<AdvanceOrderModalProps> = ({
           onClose={() => setIsChefPrintSuccessOpen(false)}
         />
       )}
+
+      {/* Add New Venue Modal */}
+      <AddNewVenueModal
+        isOpen={isAddNewVenueOpen}
+        initialVenueName={venueSearchQuery}
+        onClose={() => setIsAddNewVenueOpen(false)}
+        onSuccess={(newLoc) => {
+          setLocations(prev => [...prev, newLoc]);
+          handleSelectVenueLocation(newLoc);
+        }}
+      />
     </div>
   );
 };
