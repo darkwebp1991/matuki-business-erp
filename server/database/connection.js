@@ -9,7 +9,13 @@ function getDatabasePath() {
     return process.env.MATUKI_DB_PATH;
   }
 
-  // Check local ./data/matuki.db in current working directory first (portable mode)
+  // 1. Check production server /var/www/erp/data/matuki.db first
+  const serverDb = '/var/www/erp/data/matuki.db';
+  if (fs.existsSync(serverDb)) {
+    return serverDb;
+  }
+
+  // 2. Check local ./data/matuki.db in current working directory (portable mode)
   const localDir = path.join(process.cwd(), 'data');
   const localDb = path.join(localDir, 'matuki.db');
   if (fs.existsSync(localDb)) {

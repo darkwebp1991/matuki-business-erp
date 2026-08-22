@@ -82,7 +82,7 @@ fi
 
 # 7. Restart backend & frontend PM2 processes
 echo "🔄 Restarting ERP services..."
-pm2 restart matuki-backend || pm2 start server/index.js --name "matuki-backend"
+pm2 restart matuki-backend || pm2 start server/index.js --name "matuki-backend" --cwd "/var/www/erp"
 pm2 restart matuki-frontend || pm2 start "npx vite preview --host 0.0.0.0 --port 5173" --name "matuki-frontend"
 pm2 save
 
