@@ -205,32 +205,11 @@ export const advanceOrderService = {
     let customerMobile = (data.customer_mobile || '').trim();
     let customerId = data.customer_id ? Number(data.customer_id) : null;
 
-    if (customerId && customerName && customerName !== 'Walk-in Caterer') {
-      const cust = db.prepare('SELECT id, name, mobile FROM customers WHERE id = ?').get(customerId);
-      if (cust && cust.name.toLowerCase().trim() === customerName.toLowerCase()) {
-        customerName = cust.name;
-        if (!customerMobile) customerMobile = cust.mobile || '';
-      } else {
-        const matchCust = db.prepare('SELECT id, name, mobile FROM customers WHERE LOWER(TRIM(name)) = LOWER(TRIM(?))').get(customerName);
-        if (matchCust) {
-          customerId = matchCust.id;
-          customerName = matchCust.name;
-          if (!customerMobile) customerMobile = matchCust.mobile || '';
-        } else {
-          customerId = null;
-        }
-      }
-    } else if (customerId && (!customerName || customerName === 'Walk-in Caterer')) {
-      const cust = db.prepare('SELECT id, name, mobile FROM customers WHERE id = ?').get(customerId);
-      if (cust) {
-        customerName = cust.name;
-        if (!customerMobile) customerMobile = cust.mobile || '';
-      }
-    } else if (customerName && customerName !== 'Walk-in Caterer' && !customerId) {
-      const matchCust = db.prepare('SELECT id, name, mobile FROM customers WHERE LOWER(TRIM(name)) = LOWER(TRIM(?))').get(customerName);
-      if (matchCust) {
-        customerId = matchCust.id;
-        if (!customerMobile) customerMobile = matchCust.mobile || '';
+    // Auto-sync customer to master table if not present
+    if (customerName && customerName !== 'Walk-in Caterer' && customerName !== 'Cash Walk-in Customer') {
+      const syncedId = partyService.ensureCustomerExists(customerName, customerMobile);
+      if (syncedId) {
+        customerId = syncedId;
       }
     }
 

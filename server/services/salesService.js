@@ -274,28 +274,11 @@ export const salesService = {
       let customerId = data.customer_id ? Number(data.customer_id) : null;
       let customerName = (data.customer_name || 'Cash Walk-in Customer').trim();
 
-      if (customerId && customerName && customerName !== 'Cash Walk-in Customer') {
-        const cust = db.prepare('SELECT id, name, mobile FROM customers WHERE id = ?').get(customerId);
-        if (cust && cust.name.toLowerCase().trim() === customerName.toLowerCase()) {
-          customerName = cust.name;
-        } else {
-          const matchCust = db.prepare('SELECT id, name, mobile FROM customers WHERE LOWER(TRIM(name)) = LOWER(TRIM(?))').get(customerName);
-          if (matchCust) {
-            customerId = matchCust.id;
-            customerName = matchCust.name;
-          } else {
-            customerId = null;
-          }
-        }
-      } else if (customerId && (!customerName || customerName === 'Cash Walk-in Customer')) {
-        const cust = db.prepare('SELECT id, name, mobile FROM customers WHERE id = ?').get(customerId);
-        if (cust) {
-          customerName = cust.name;
-        }
-      } else if (customerName && customerName !== 'Cash Walk-in Customer' && !customerId) {
-        const matchCust = db.prepare('SELECT id, name, mobile FROM customers WHERE LOWER(TRIM(name)) = LOWER(TRIM(?))').get(customerName);
-        if (matchCust) {
-          customerId = matchCust.id;
+      // Auto-sync customer to master table if not present
+      if (customerName && customerName !== 'Cash Walk-in Customer' && customerName !== 'Walk-in Caterer') {
+        const syncedId = partyService.ensureCustomerExists(customerName, data.customer_mobile);
+        if (syncedId) {
+          customerId = syncedId;
         }
       }
 

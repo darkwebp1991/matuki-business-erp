@@ -2,6 +2,68 @@ import { getDatabase, runInTransaction } from '../database/connection.js';
 import { settingsService } from './settingsService.js';
 
 export const partyService = {
+  // Auto-sync missing parties to customers master list
+  ensureCustomerExists(name, mobile = '') {
+    if (!name) return null;
+    const trimmedName = name.trim();
+    if (!trimmedName || trimmedName === 'Walk-in Caterer' || trimmedName === 'Cash Walk-in Customer') {
+      return null;
+    }
+
+    const db = getDatabase();
+
+    // 1. Check if exists in customers table (case-insensitive)
+    const existingCust = db.prepare('SELECT id FROM customers WHERE LOWER(TRIM(name)) = LOWER(TRIM(?))').get(trimmedName);
+    if (existingCust) return existingCust.id;
+
+    // 2. Check if exists in suppliers table (do not duplicate pure suppliers)
+    const existingSupp = db.prepare('SELECT id FROM suppliers WHERE LOWER(TRIM(name)) = LOWER(TRIM(?))').get(trimmedName);
+    if (existingSupp) return null;
+
+    // 3. Auto-create customer in customers master table!
+    try {
+      const custNo = settingsService.getNextDocumentNumber('CUSTOMER');
+      const trimmedMobile = (mobile || '').trim();
+
+      const insertStmt = db.prepare(`
+        INSERT INTO customers (customer_no, name, mobile, address, opening_balance, active)
+        VALUES (?, ?, ?, '', 0, 1)
+      `);
+      const res = insertStmt.run(custNo, trimmedName, trimmedMobile);
+      const newId = Number(res.lastInsertRowid);
+      console.log(`[Auto-Sync] Auto-created missing customer "${trimmedName}" (${custNo}) in Customers Master List (ID: ${newId})`);
+      return newId;
+    } catch (err) {
+      console.error('Error auto-creating customer:', err);
+      return null;
+    }
+  },
+
+  autoSyncAllMissingParties() {
+    const db = getDatabase();
+    try {
+      const query = `
+        SELECT DISTINCT party_name, party_mobile FROM (
+          SELECT customer_name as party_name, customer_mobile as party_mobile FROM advance_orders WHERE customer_name IS NOT NULL AND TRIM(customer_name) != '' AND customer_name != 'Walk-in Caterer' AND customer_name != 'Cash Walk-in Customer'
+          UNION
+          SELECT customer_name as party_name, customer_mobile as party_mobile FROM sales WHERE customer_name IS NOT NULL AND TRIM(customer_name) != '' AND customer_name != 'Cash Walk-in Customer'
+        )
+        WHERE LOWER(TRIM(party_name)) NOT IN (SELECT LOWER(TRIM(name)) FROM customers)
+          AND LOWER(TRIM(party_name)) NOT IN (SELECT LOWER(TRIM(name)) FROM suppliers)
+      `;
+      const missing = db.prepare(query).all();
+      for (const row of missing) {
+        const newCustId = partyService.ensureCustomerExists(row.party_name, row.party_mobile);
+        if (newCustId) {
+          db.prepare('UPDATE advance_orders SET customer_id = ? WHERE LOWER(TRIM(customer_name)) = LOWER(TRIM(?)) AND (customer_id IS NULL OR customer_id = 0)').run(newCustId, row.party_name);
+          db.prepare('UPDATE sales SET customer_id = ? WHERE LOWER(TRIM(customer_name)) = LOWER(TRIM(?)) AND (customer_id IS NULL OR customer_id = 0)').run(newCustId, row.party_name);
+        }
+      }
+    } catch (err) {
+      console.error('Error in autoSyncAllMissingParties:', err);
+    }
+  },
+
   // --- CUSTOMERS ---
   getCustomers(filters = {}) {
     const db = getDatabase();

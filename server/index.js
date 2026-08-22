@@ -41,6 +41,13 @@ try {
   // Auto-seed if first run
   seedSweetsData(false);
 
+  // Auto-sync missing parties from orders/sales to customers master table
+  try {
+    partyService.autoSyncAllMissingParties();
+  } catch (e) {
+    console.warn('Auto-sync missing parties note:', e.message);
+  }
+
   // Auto-heal / self-sync ledger entries if sales exist but ledger is missing
   try {
     const dbCheck = getDatabase();
