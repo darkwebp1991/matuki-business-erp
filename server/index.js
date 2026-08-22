@@ -709,6 +709,11 @@ const server = http.createServer(async (req, res) => {
       const rates = salesService.getCustomerLastItemRates(id);
       return sendJson(res, 200, { success: true, data: rates });
     }
+    if (pathname.match(/^\/api\/customers\/(\d+)\/smart-recommendations$/) && method === 'GET') {
+      const id = pathname.split('/')[3];
+      const recs = partyService.getCustomerSmartRecommendations(id);
+      return sendJson(res, 200, { success: true, data: recs });
+    }
 
     if (pathname === '/api/customers/bulk-import' && method === 'POST') {
       const body = await parseBody(req);

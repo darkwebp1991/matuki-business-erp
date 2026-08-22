@@ -107,6 +107,10 @@ export const AdvanceOrderModal: React.FC<AdvanceOrderModalProps> = ({
   const [isAddNewVenueOpen, setIsAddNewVenueOpen] = useState<boolean>(false);
   const venueSearchRef = useRef<HTMLDivElement>(null);
 
+  // AI Smart Recommendation State
+  const [frequentVenues, setFrequentVenues] = useState<Array<{ venue_name: string; usage_count: number; address?: string; area_landmark?: string; customer_charge?: number; driver_rent?: number }>>([]);
+  const [frequentProducts, setFrequentProducts] = useState<Array<{ product_id: number | null; item_name: string; order_count: number; total_qty: number; unit: string; rate: number; code?: string }>>([]);
+
   // Rickshaw Driver & Financials
   const [selectedDriverId, setSelectedDriverId] = useState<string>('');
   const [tripType, setTripType] = useState<'ROUND_TRIP' | 'ONE_WAY'>('ROUND_TRIP');
@@ -313,12 +317,36 @@ export const AdvanceOrderModal: React.FC<AdvanceOrderModalProps> = ({
     }
   };
 
+  const loadSmartRecommendations = (cId: number) => {
+    if (!cId) {
+      setFrequentVenues([]);
+      setFrequentProducts([]);
+      return;
+    }
+    api.getCustomerSmartRecommendations(cId).then(res => {
+      if (res) {
+        setFrequentVenues(res.frequentVenues || []);
+        setFrequentProducts(res.frequentProducts || []);
+        if (res.frequentVenues && res.frequentVenues.length > 0 && !deliveryVenue) {
+          const top = res.frequentVenues[0];
+          setDeliveryVenue(top.venue_name);
+          setVenueSearchQuery(top.venue_name);
+          if (top.address) setDeliveryAddress(top.address);
+          if (top.customer_charge) setCustomerDeliveryCharge(top.customer_charge);
+          if (top.driver_rent) setDriverDeliveryRate(top.driver_rent);
+        }
+      }
+    }).catch(console.error);
+  };
+
   const handleCustomerChange = (selectedId: string) => {
     setCustomerId(selectedId);
     if (!selectedId) {
       setCustomerName('');
       setCustomerMobile('');
       setCustomerBalance(0);
+      setFrequentVenues([]);
+      setFrequentProducts([]);
       return;
     }
 
@@ -331,6 +359,7 @@ export const AdvanceOrderModal: React.FC<AdvanceOrderModalProps> = ({
         setDeliveryAddress(cust.address);
       }
     }
+    loadSmartRecommendations(Number(selectedId));
   };
 
   // Helper: Trip Type Toggle with automatic 50% / 100% rate adjustment
@@ -830,6 +859,7 @@ export const AdvanceOrderModal: React.FC<AdvanceOrderModalProps> = ({
                               setDeliveryAddress(p.address);
                             }
                             setIsPartyDropdownOpen(false);
+                            loadSmartRecommendations(p.id);
                           }}
                           style={{
                             padding: '8px 12px',
@@ -1016,6 +1046,50 @@ export const AdvanceOrderModal: React.FC<AdvanceOrderModalProps> = ({
                     >
                       <Plus size={14} /> Add &quot;{venueSearchQuery || 'New Venue'}&quot; to Venue Master List
                     </div>
+
+                    {/* AI Frequent Venues for Selected Customer */}
+                    {frequentVenues.length > 0 && !venueSearchQuery && (
+                      <div style={{ background: '#f0fdf4', borderBottom: '1.5px solid #86efac', padding: '6px 10px' }}>
+                        <div style={{ fontSize: '0.70rem', fontWeight: 900, color: '#15803d', display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '4px' }}>
+                          <Sparkles size={11} color="#16a34a" /> ⭐ AI SUGGESTED VENUES FOR {customerName ? customerName.toUpperCase() : 'PARTY'}
+                        </div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                          {frequentVenues.map((fv, idx) => (
+                            <div
+                              key={`fv_${idx}`}
+                              onClick={() => {
+                                setDeliveryVenue(fv.venue_name);
+                                setVenueSearchQuery(fv.venue_name);
+                                if (fv.address) setDeliveryAddress(fv.address);
+                                if (fv.customer_charge) setCustomerDeliveryCharge(fv.customer_charge);
+                                if (fv.driver_rent) setDriverDeliveryRate(fv.driver_rent);
+                                setIsVenueDropdownOpen(false);
+                              }}
+                              style={{
+                                padding: '5px 8px',
+                                background: '#ffffff',
+                                border: '1px solid #bbf7d0',
+                                borderRadius: '4px',
+                                cursor: 'pointer',
+                                fontSize: '0.78rem',
+                                fontWeight: 800,
+                                color: '#166534',
+                                display: 'flex',
+                                justifyContent: 'space-between',
+                                alignItems: 'center'
+                              }}
+                              onMouseEnter={(e) => (e.currentTarget.style.background = '#dcfce7')}
+                              onMouseLeave={(e) => (e.currentTarget.style.background = '#ffffff')}
+                            >
+                              <span>📍 {fv.venue_name} {fv.area_landmark ? `(${fv.area_landmark})` : ''}</span>
+                              <span style={{ fontSize: '0.68rem', color: '#15803d', fontWeight: 700, background: '#dcfce7', padding: '1px 6px', borderRadius: '10px' }}>
+                                Used {fv.usage_count}x
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
 
                     {filteredLocations.map(loc => (
                       <div
@@ -1322,6 +1396,55 @@ export const AdvanceOrderModal: React.FC<AdvanceOrderModalProps> = ({
                               <span style={{ textAlign: 'right' }}>RATE</span>
                               <span style={{ textAlign: 'right' }}>STOCK</span>
                             </div>
+
+                            {/* AI Frequent Sweets for Selected Customer */}
+                            {frequentProducts.length > 0 && !row.product_name && (
+                              <div style={{ background: '#f0fdf4', borderBottom: '1.5px solid #86efac', padding: '6px 10px' }}>
+                                <div style={{ fontSize: '0.70rem', fontWeight: 900, color: '#15803d', display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '4px' }}>
+                                  <Sparkles size={11} color="#16a34a" /> ⭐ {customerName ? customerName.toUpperCase() : 'PARTY'}'S MOST ORDERED SWEETS
+                                </div>
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px' }}>
+                                  {frequentProducts.map((fp, fpIdx) => {
+                                    const matchingProd = products.find(p => p.id === fp.product_id || p.name.toLowerCase() === fp.item_name.toLowerCase());
+                                    return (
+                                      <div
+                                        key={`fp_${fpIdx}`}
+                                        onClick={() => {
+                                          if (matchingProd) {
+                                            handleSelectProduct(idx, matchingProd);
+                                          } else {
+                                            handleItemFieldChange(idx, 'product_name', fp.item_name);
+                                            handleItemFieldChange(idx, 'rate', fp.rate);
+                                            handleItemFieldChange(idx, 'unit', fp.unit);
+                                            setActiveItemDropdownIdx(null);
+                                          }
+                                        }}
+                                        style={{
+                                          padding: '5px 8px',
+                                          background: '#ffffff',
+                                          border: '1px solid #bbf7d0',
+                                          borderRadius: '4px',
+                                          cursor: 'pointer',
+                                          fontSize: '0.76rem',
+                                          fontWeight: 800,
+                                          color: '#166534',
+                                          display: 'flex',
+                                          justifyContent: 'space-between',
+                                          alignItems: 'center'
+                                        }}
+                                        onMouseEnter={(e) => (e.currentTarget.style.background = '#dcfce7')}
+                                        onMouseLeave={(e) => (e.currentTarget.style.background = '#ffffff')}
+                                      >
+                                        <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>🍬 {fp.item_name}</span>
+                                        <span style={{ fontSize: '0.68rem', color: '#047857', fontFamily: 'monospace', fontWeight: 800 }}>
+                                          ₹{fp.rate}
+                                        </span>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+                            )}
 
                             {filteredProducts.map(prod => (
                               <div

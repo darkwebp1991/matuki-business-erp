@@ -20,7 +20,8 @@ import {
   UserPlus,
   User,
   Phone,
-  Mic
+  Mic,
+  Sparkles
 } from 'lucide-react';
 import { api } from '../../api/client';
 import { Product, Customer, Driver, DeliveryLocation, AreaDeliveryRate, AdvanceOrder, Sale, VasanMasterItem } from '../../types';
@@ -109,6 +110,10 @@ export const NewSaleModal: React.FC<NewSaleModalProps> = ({
 
   // Party-Wise Last Billed Item Rates Map
   const [customerLastRates, setCustomerLastRates] = useState<Record<number, { rate: number; discount: number; last_date: string; invoice_no: string }>>({});
+
+  // AI Smart Recommendation State
+  const [frequentVenues, setFrequentVenues] = useState<Array<{ venue_name: string; usage_count: number; address?: string; area_landmark?: string; customer_charge?: number; driver_rent?: number }>>([]);
+  const [frequentProducts, setFrequentProducts] = useState<Array<{ product_id: number | null; item_name: string; order_count: number; total_qty: number; unit: string; rate: number; code?: string }>>([]);
 
   // Vasan Master Rates
   const [vasanMasterList, setVasanMasterList] = useState<VasanMasterItem[]>([]);
@@ -389,6 +394,22 @@ export const NewSaleModal: React.FC<NewSaleModalProps> = ({
           return row;
         }));
       }).catch(console.error);
+
+      // Fetch AI Smart Recommendations
+      api.getCustomerSmartRecommendations(cust.id).then(res => {
+        if (res) {
+          setFrequentVenues(res.frequentVenues || []);
+          setFrequentProducts(res.frequentProducts || []);
+          if (res.frequentVenues && res.frequentVenues.length > 0 && !deliveryVenue) {
+            const top = res.frequentVenues[0];
+            setDeliveryVenue(top.venue_name);
+            setVenueSearchQuery(top.venue_name);
+            if (top.address) setDeliveryAddress(top.address);
+            if (top.customer_charge) setDeliveryCharge(top.customer_charge);
+            if (top.driver_rent) setRickshawRent(top.driver_rent);
+          }
+        }
+      }).catch(console.error);
     } else {
       setCustomerId('');
       setCustomerName('Cash Walk-in Customer');
@@ -398,6 +419,8 @@ export const NewSaleModal: React.FC<NewSaleModalProps> = ({
       setCustomerAdvanceBalance(0);
       setAdvanceAdjusted(0);
       setCustomerLastRates({});
+      setFrequentVenues([]);
+      setFrequentProducts([]);
 
       setItems(prevItems => prevItems.map(row => {
         if (row.product_id) {
@@ -1361,6 +1384,50 @@ export const NewSaleModal: React.FC<NewSaleModalProps> = ({
                       <Plus size={12} /> Add &quot;{venueSearchQuery || 'New Venue'}&quot; to Venue Master List
                     </div>
 
+                    {/* AI Frequent Venues for Selected Customer */}
+                    {frequentVenues.length > 0 && !venueSearchQuery && (
+                      <div style={{ background: '#f0fdf4', borderBottom: '1.5px solid #86efac', padding: '6px 10px' }}>
+                        <div style={{ fontSize: '0.70rem', fontWeight: 900, color: '#15803d', display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '4px' }}>
+                          <Sparkles size={11} color="#16a34a" /> ⭐ AI SUGGESTED VENUES FOR {customerName ? customerName.toUpperCase() : 'PARTY'}
+                        </div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                          {frequentVenues.map((fv, idx) => (
+                            <div
+                              key={`fv_sale_${idx}`}
+                              onClick={() => {
+                                setDeliveryVenue(fv.venue_name);
+                                setVenueSearchQuery(fv.venue_name);
+                                if (fv.address) setDeliveryAddress(fv.address);
+                                if (fv.customer_charge) setDeliveryCharge(fv.customer_charge);
+                                if (fv.driver_rent) setRickshawRent(fv.driver_rent);
+                                setIsVenueDropdownOpen(false);
+                              }}
+                              style={{
+                                padding: '5px 8px',
+                                background: '#ffffff',
+                                border: '1px solid #bbf7d0',
+                                borderRadius: '4px',
+                                cursor: 'pointer',
+                                fontSize: '0.76rem',
+                                fontWeight: 800,
+                                color: '#166534',
+                                display: 'flex',
+                                justifyContent: 'space-between',
+                                alignItems: 'center'
+                              }}
+                              onMouseEnter={(e) => (e.currentTarget.style.background = '#dcfce7')}
+                              onMouseLeave={(e) => (e.currentTarget.style.background = '#ffffff')}
+                            >
+                              <span>📍 {fv.venue_name} {fv.area_landmark ? `(${fv.area_landmark})` : ''}</span>
+                              <span style={{ fontSize: '0.68rem', color: '#15803d', fontWeight: 700, background: '#dcfce7', padding: '1px 6px', borderRadius: '10px' }}>
+                                Used {fv.usage_count}x
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
                     {locations.filter(l => {
                       if (!venueSearchQuery) return true;
                       const q = venueSearchQuery.toLowerCase();
@@ -1755,6 +1822,55 @@ export const NewSaleModal: React.FC<NewSaleModalProps> = ({
                         >
                           📦 + Blank Outer Packing Row (Only Carat / Dol)
                         </div>
+
+                        {/* AI Frequent Sweets for Selected Customer */}
+                        {frequentProducts.length > 0 && !row.product_name && (
+                          <div style={{ background: '#f0fdf4', borderBottom: '1.5px solid #86efac', padding: '6px 10px' }}>
+                            <div style={{ fontSize: '0.70rem', fontWeight: 900, color: '#15803d', display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '4px' }}>
+                              <Sparkles size={11} color="#16a34a" /> ⭐ {customerName ? customerName.toUpperCase() : 'PARTY'}'S MOST ORDERED SWEETS
+                            </div>
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px' }}>
+                              {frequentProducts.map((fp, fpIdx) => {
+                                const matchingProd = products.find(p => p.id === fp.product_id || p.name.toLowerCase() === fp.item_name.toLowerCase());
+                                return (
+                                  <div
+                                    key={`fp_sale_${fpIdx}`}
+                                    onClick={() => {
+                                      if (matchingProd) {
+                                        handleSelectProduct(idx, matchingProd);
+                                      } else {
+                                        handleItemFieldChange(idx, 'product_name', fp.item_name);
+                                        handleItemFieldChange(idx, 'rate', fp.rate);
+                                        handleItemFieldChange(idx, 'unit', fp.unit);
+                                        setActiveItemDropdownIdx(null);
+                                      }
+                                    }}
+                                    style={{
+                                      padding: '5px 8px',
+                                      background: '#ffffff',
+                                      border: '1px solid #bbf7d0',
+                                      borderRadius: '4px',
+                                      cursor: 'pointer',
+                                      fontSize: '0.76rem',
+                                      fontWeight: 800,
+                                      color: '#166534',
+                                      display: 'flex',
+                                      justifyContent: 'space-between',
+                                      alignItems: 'center'
+                                    }}
+                                    onMouseEnter={(e) => (e.currentTarget.style.background = '#dcfce7')}
+                                    onMouseLeave={(e) => (e.currentTarget.style.background = '#ffffff')}
+                                  >
+                                    <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>🍬 {fp.item_name}</span>
+                                    <span style={{ fontSize: '0.68rem', color: '#047857', fontFamily: 'monospace', fontWeight: 800 }}>
+                                      ₹{fp.rate}
+                                    </span>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        )}
 
                         {filteredProducts.map((prod, prodIdx) => {
                           const isHighlighted = prodIdx === itemHighlightIdx;

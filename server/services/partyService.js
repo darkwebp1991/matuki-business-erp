@@ -176,6 +176,107 @@ export const partyService = {
     };
   },
 
+  getCustomerSmartRecommendations(id) {
+    const db = getDatabase();
+    const cId = Number(id);
+    if (!cId) return { frequentVenues: [], frequentProducts: [] };
+
+    const cust = db.prepare('SELECT name FROM customers WHERE id = ?').get(cId);
+    const cName = cust ? cust.name : '';
+
+    // 1. Most Frequently & Recently Used Delivery Venues for this Customer
+    let frequentVenues = [];
+    try {
+      const venuesQuery = `
+        SELECT delivery_venue as venue_name, COUNT(*) as usage_count, MAX(last_used) as last_used_date FROM (
+          SELECT delivery_venue, created_at as last_used FROM advance_orders WHERE (customer_id = ? OR (customer_name = ? AND ? != '')) AND delivery_venue != '' AND delivery_venue IS NOT NULL
+          UNION ALL
+          SELECT delivery_venue, date as last_used FROM sales WHERE (customer_id = ? OR (customer_name = ? AND ? != '')) AND delivery_venue != '' AND delivery_venue IS NOT NULL
+        )
+        GROUP BY delivery_venue
+        ORDER BY usage_count DESC, last_used_date DESC
+        LIMIT 5
+      `;
+      const rawVenues = db.prepare(venuesQuery).all(cId, cName, cName, cId, cName, cName);
+      
+      const getLocStmt = db.prepare('SELECT * FROM delivery_locations WHERE LOWER(venue_name) = LOWER(?) OR LOWER(venue_name) LIKE LOWER(?) LIMIT 1');
+      frequentVenues = rawVenues.map(v => {
+        const locMatch = getLocStmt.get(v.venue_name, `%${v.venue_name}%`);
+        return {
+          venue_name: v.venue_name,
+          usage_count: v.usage_count,
+          address: locMatch?.address || '',
+          area_landmark: locMatch?.area_landmark || '',
+          customer_charge: locMatch?.customer_charge || 0,
+          driver_rent: locMatch?.driver_rent || 0
+        };
+      });
+    } catch (err) {
+      console.error('Error fetching frequent venues:', err);
+    }
+
+    // 2. Most Frequently & Recently Ordered Products for this Customer
+    let frequentProducts = [];
+    try {
+      const productsQuery = `
+        SELECT 
+          product_id, 
+          item_name, 
+          COUNT(*) as order_count, 
+          SUM(quantity) as total_qty
+        FROM (
+          SELECT aoi.product_id, aoi.item_name as item_name, aoi.quantity 
+          FROM advance_order_items aoi
+          JOIN advance_orders ao ON aoi.order_id = ao.id
+          WHERE (ao.customer_id = ? OR (ao.customer_name = ? AND ? != ''))
+
+          UNION ALL
+
+          SELECT si.product_id, si.product_name as item_name, si.quantity
+          FROM sale_items si
+          JOIN sales s ON si.sale_id = s.id
+          WHERE (s.customer_id = ? OR (s.customer_name = ? AND ? != ''))
+        )
+        WHERE item_name IS NOT NULL AND item_name != ''
+        GROUP BY product_id, item_name
+        ORDER BY order_count DESC, total_qty DESC
+        LIMIT 8
+      `;
+      const rawProducts = db.prepare(productsQuery).all(cId, cName, cName, cId, cName, cName);
+
+      const getProdStmt = db.prepare('SELECT selling_rate, unit, code FROM products WHERE id = ?');
+      const getProdByNameStmt = db.prepare('SELECT id, selling_rate, unit, code FROM products WHERE LOWER(name) = LOWER(?) LIMIT 1');
+
+      frequentProducts = rawProducts.map(p => {
+        let pInfo = p.product_id ? getProdStmt.get(p.product_id) : null;
+        let finalProdId = p.product_id;
+        if (!pInfo) {
+          const matchByName = getProdByNameStmt.get(p.item_name);
+          if (matchByName) {
+            pInfo = matchByName;
+            finalProdId = matchByName.id;
+          }
+        }
+        return {
+          product_id: finalProdId || null,
+          item_name: p.item_name,
+          order_count: p.order_count,
+          total_qty: p.total_qty,
+          unit: pInfo?.unit || 'KG',
+          rate: pInfo?.selling_rate || 0,
+          code: pInfo?.code || ''
+        };
+      });
+    } catch (err) {
+      console.error('Error fetching frequent products:', err);
+    }
+
+    return {
+      frequentVenues,
+      frequentProducts
+    };
+  },
+
   createCustomer(data, username = 'Admin') {
     return runInTransaction((db) => {
       const trimmedName = (data.name || '').trim();
