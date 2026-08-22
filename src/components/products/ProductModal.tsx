@@ -270,7 +270,7 @@ export const ProductModal: React.FC<ProductModalProps> = ({
         }
       }
 
-      onSuccess(targetProduct);
+      onSuccess(targetProduct || undefined);
     } catch (err: any) {
       setError(err.message || 'Failed to save item');
     } finally {
