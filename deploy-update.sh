@@ -22,7 +22,8 @@ if command -v iptables > /dev/null 2>&1; then
     sudo iptables -I INPUT -p tcp --dport 80 -j ACCEPT || true
 fi
 
-# 2. Flush SQLite WAL to ensure 100% data safety
+# 2. Flush & Clear SQLite WAL to apply newly uploaded matuki.db
+rm -f data/matuki.db-wal data/matuki.db-shm
 python3 -c "
 import sqlite3, os
 db_path = os.path.abspath('data/matuki.db')
@@ -33,9 +34,9 @@ if os.path.exists(db_path):
     print('✅ SQLite WAL checkpoint completed safely.')
 " || true
 
-# 3. Pull latest code updates from GitHub
+# 3. Force pull latest code updates from GitHub
 echo "📥 Pulling latest code changes..."
-git checkout -- wa_session/creds.json > /dev/null 2>&1 || true
+git checkout -- . || true
 git pull origin main || git pull
 
 # 4. Install any new npm packages
