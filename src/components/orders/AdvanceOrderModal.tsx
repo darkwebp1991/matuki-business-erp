@@ -111,6 +111,9 @@ export const AdvanceOrderModal: React.FC<AdvanceOrderModalProps> = ({
   const [frequentVenues, setFrequentVenues] = useState<Array<{ venue_name: string; usage_count: number; address?: string; area_landmark?: string; customer_charge?: number; driver_rent?: number }>>([]);
   const [frequentProducts, setFrequentProducts] = useState<Array<{ product_id: number | null; item_name: string; order_count: number; total_qty: number; unit: string; rate: number; code?: string }>>([]);
 
+  // Party-Wise Last Billed Item Rates Map
+  const [customerLastRates, setCustomerLastRates] = useState<Record<number, { rate: number; discount: number; last_date: string; invoice_no: string }>>({});
+
   // Rickshaw Driver & Financials
   const [selectedDriverId, setSelectedDriverId] = useState<string>('');
   const [tripType, setTripType] = useState<'ROUND_TRIP' | 'ONE_WAY'>('ROUND_TRIP');
@@ -321,8 +324,10 @@ export const AdvanceOrderModal: React.FC<AdvanceOrderModalProps> = ({
     if (!cId) {
       setFrequentVenues([]);
       setFrequentProducts([]);
+      setCustomerLastRates({});
       return;
     }
+    // Fetch AI Smart Recommendations (Venues & Products)
     api.getCustomerSmartRecommendations(cId).then(res => {
       if (res) {
         setFrequentVenues(res.frequentVenues || []);
@@ -336,6 +341,26 @@ export const AdvanceOrderModal: React.FC<AdvanceOrderModalProps> = ({
           if (top.driver_rent) setDriverDeliveryRate(top.driver_rent);
         }
       }
+    }).catch(console.error);
+
+    // Fetch Party-Wise Last Billed Item Rates
+    api.getCustomerLastRates(cId).then(rates => {
+      const rateMap = rates || {};
+      setCustomerLastRates(rateMap);
+      setItems(prevItems => prevItems.map(row => {
+        if (row.product_id && rateMap[row.product_id] && Number(rateMap[row.product_id].rate) > 0) {
+          const customRate = Number(rateMap[row.product_id].rate);
+          const qty = row.quantity === '' ? 0 : Number(row.quantity);
+          const disc = Number(row.discount_pct || 0);
+          const amt = Math.round((qty * customRate * (1 - disc / 100)) * 100) / 100;
+          return {
+            ...row,
+            rate: customRate,
+            amount: amt
+          };
+        }
+        return row;
+      }));
     }).catch(console.error);
   };
 
@@ -434,7 +459,8 @@ export const AdvanceOrderModal: React.FC<AdvanceOrderModalProps> = ({
     const updated = [...items];
     const current = updated[index];
     const qty = current.quantity === '' ? 1 : Number(current.quantity);
-    const rate = prod.selling_rate || 0;
+    const lastRateObj = customerLastRates[prod.id];
+    const rate = (lastRateObj && Number(lastRateObj.rate) > 0) ? Number(lastRateObj.rate) : (prod.selling_rate || 0);
     const disc = current.discount_pct || 0;
     const gross = qty * rate;
     const discountVal = gross * (disc / 100);
@@ -1474,7 +1500,12 @@ export const AdvanceOrderModal: React.FC<AdvanceOrderModalProps> = ({
                                   <div style={{ fontSize: '0.7rem', color: '#64748b' }}>Code: {prod.code}</div>
                                 </div>
                                 <div style={{ textAlign: 'right', fontWeight: 800, color: '#047857', fontFamily: 'monospace' }}>
-                                  ₹{prod.selling_rate || 0}
+                                  ₹{customerLastRates[prod.id] ? customerLastRates[prod.id].rate : (prod.selling_rate || 0)}
+                                  {customerLastRates[prod.id] && (
+                                    <div style={{ fontSize: '0.66rem', color: '#15803d', fontWeight: 800, background: '#dcfce7', padding: '1px 4px', borderRadius: '3px', marginTop: '1px' }}>
+                                      ⭐ Party Rate ₹{customerLastRates[prod.id].rate}
+                                    </div>
+                                  )}
                                 </div>
                                 <div style={{ textAlign: 'right', fontSize: '0.74rem', color: prod.current_stock < 0 ? '#dc2626' : '#475569' }}>
                                   {prod.current_stock || 0} {prod.unit}

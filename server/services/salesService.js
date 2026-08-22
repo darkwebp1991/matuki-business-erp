@@ -81,31 +81,57 @@ export const salesService = {
   getCustomerLastItemRates(customerId) {
     if (!customerId) return {};
     const db = getDatabase();
+    const cId = Number(customerId);
+
+    const cust = db.prepare('SELECT name FROM customers WHERE id = ?').get(cId);
+    const cName = cust ? cust.name : '';
+
     const rows = db.prepare(`
-      WITH RankedSales AS (
+      WITH CombinedHistory AS (
         SELECT 
           si.product_id,
           si.rate as last_rate,
           si.discount as last_discount,
-          s.date as last_date,
-          s.invoice_no,
-          ROW_NUMBER() OVER (PARTITION BY si.product_id ORDER BY s.date DESC, s.id DESC) as rn
+          s.date as tx_date,
+          s.invoice_no as doc_no
         FROM sale_items si
         JOIN sales s ON si.sale_id = s.id
-        WHERE s.customer_id = ? AND s.status = 'ACTIVE' AND si.product_id IS NOT NULL AND si.rate > 0
+        WHERE (s.customer_id = ? OR (s.customer_name = ? AND ? != '')) AND s.status != 'CANCELLED' AND si.product_id IS NOT NULL AND si.rate > 0
+
+        UNION ALL
+
+        SELECT 
+          aoi.product_id,
+          aoi.rate as last_rate,
+          0 as last_discount,
+          ao.created_at as tx_date,
+          ao.order_no as doc_no
+        FROM advance_order_items aoi
+        JOIN advance_orders ao ON aoi.order_id = ao.id
+        WHERE (ao.customer_id = ? OR (ao.customer_name = ? AND ? != '')) AND ao.status != 'CANCELLED' AND aoi.product_id IS NOT NULL AND aoi.rate > 0
+      ),
+      RankedHistory AS (
+        SELECT 
+          product_id,
+          last_rate,
+          last_discount,
+          tx_date,
+          doc_no,
+          ROW_NUMBER() OVER (PARTITION BY product_id ORDER BY tx_date DESC) as rn
+        FROM CombinedHistory
       )
-      SELECT product_id, last_rate, last_discount, last_date, invoice_no
-      FROM RankedSales
+      SELECT product_id, last_rate, last_discount, tx_date, doc_no
+      FROM RankedHistory
       WHERE rn = 1
-    `).all(Number(customerId));
+    `).all(cId, cName, cName, cId, cName, cName);
 
     const rateMap = {};
     for (const r of rows) {
       rateMap[r.product_id] = {
         rate: r.last_rate,
-        discount: r.last_discount,
-        last_date: r.last_date,
-        invoice_no: r.invoice_no
+        discount: r.last_discount || 0,
+        last_date: r.tx_date,
+        invoice_no: r.doc_no
       };
     }
     return rateMap;
