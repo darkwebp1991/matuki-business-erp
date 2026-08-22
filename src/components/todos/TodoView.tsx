@@ -410,6 +410,23 @@ export const TodoView: React.FC<TodoViewProps> = ({ currentUser, settings }) => 
     }
   };
 
+  // Small Option: Assign / Reassign Task to Team Member
+  const handleAssignTaskToUser = async (id: number, targetAssignee: string) => {
+    try {
+      const isSelf = targetAssignee.toLowerCase() === activeUsername.toLowerCase();
+      const payload = {
+        assigned_to_name: targetAssignee,
+        assigned_by_name: activeUsername,
+        assignment_status: isSelf ? 'ACCEPTED' : 'PENDING_ASSIGNMENT'
+      };
+      await api.updateTodo(id, payload);
+      playNotificationChime('EXACT_TIME');
+      fetchTodos();
+    } catch (err) {
+      console.error('Failed to assign task:', err);
+    }
+  };
+
   const handleDelete = async (id: number, title: string, e?: React.MouseEvent) => {
     if (e) {
       e.preventDefault();
@@ -1210,7 +1227,35 @@ export const TodoView: React.FC<TodoViewProps> = ({ currentUser, settings }) => 
                       </div>
                     </div>
 
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }} onClick={e => e.stopPropagation()}>
+                      {/* Small Assign Dropdown */}
+                      <select
+                        value={task.assigned_to_name || activeUsername}
+                        onChange={async (e) => {
+                          const newAssignee = e.target.value;
+                          if (!newAssignee) return;
+                          await handleAssignTaskToUser(task.id, newAssignee);
+                        }}
+                        style={{
+                          fontSize: '0.66rem',
+                          fontWeight: 700,
+                          padding: '1px 4px',
+                          borderRadius: '4px',
+                          border: '1px solid #fca5a5',
+                          background: '#fef2f2',
+                          color: '#b91c1c',
+                          cursor: 'pointer'
+                        }}
+                        title="Click to assign or reassign task to team member"
+                      >
+                        <option value={activeUsername}>👤 Assign to Me</option>
+                        {users.filter(u => (u.full_name || u.username) !== activeUsername).map(u => (
+                          <option key={u.id} value={u.full_name || u.username}>
+                            👉 Assign to {u.full_name || u.username}
+                          </option>
+                        ))}
+                      </select>
+
                       <button
                         type="button"
                         onClick={(e) => handleRescheduleOverdue(task.id, e)}
@@ -1298,13 +1343,43 @@ export const TodoView: React.FC<TodoViewProps> = ({ currentUser, settings }) => 
                       </div>
                     </div>
 
-                    <button
-                      type="button"
-                      onClick={(e) => handleToggleStar(task.id, e)}
-                      style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: 0 }}
-                    >
-                      <Star size={16} fill={task.is_starred ? '#f59e0b' : 'none'} color={task.is_starred ? '#f59e0b' : '#cbd5e1'} />
-                    </button>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }} onClick={e => e.stopPropagation()}>
+                      {/* Small Assign Dropdown */}
+                      <select
+                        value={task.assigned_to_name || activeUsername}
+                        onChange={async (e) => {
+                          const newAssignee = e.target.value;
+                          if (!newAssignee) return;
+                          await handleAssignTaskToUser(task.id, newAssignee);
+                        }}
+                        style={{
+                          fontSize: '0.66rem',
+                          fontWeight: 700,
+                          padding: '1px 4px',
+                          borderRadius: '4px',
+                          border: '1px solid #cbd5e1',
+                          background: '#f8fafc',
+                          color: '#334155',
+                          cursor: 'pointer'
+                        }}
+                        title="Click to assign or reassign task to team member"
+                      >
+                        <option value={activeUsername}>👤 Assign to Me</option>
+                        {users.filter(u => (u.full_name || u.username) !== activeUsername).map(u => (
+                          <option key={u.id} value={u.full_name || u.username}>
+                            👉 Assign to {u.full_name || u.username}
+                          </option>
+                        ))}
+                      </select>
+
+                      <button
+                        type="button"
+                        onClick={(e) => handleToggleStar(task.id, e)}
+                        style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: 0 }}
+                      >
+                        <Star size={16} fill={task.is_starred ? '#f59e0b' : 'none'} color={task.is_starred ? '#f59e0b' : '#cbd5e1'} />
+                      </button>
+                    </div>
                   </div>
                 );
               })}
