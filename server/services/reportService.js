@@ -1167,7 +1167,9 @@ export const reportService = {
     const getOpLedgerStmt = db.prepare(`
       SELECT COALESCE(SUM(debit_amount - credit_amount), 0) as balance
       FROM ledger_entries
-      WHERE party_type = 'CUSTOMER' AND party_id = ? AND entry_date < ?
+      WHERE party_type = 'CUSTOMER' 
+        AND (party_id = ? OR UPPER(TRIM(party_name)) = UPPER(TRIM(?)))
+        AND entry_date < ?
     `);
 
     const getSalesStmt = db.prepare(`
@@ -1175,13 +1177,19 @@ export const reportService = {
         COALESCE(SUM(CASE WHEN voucher_type = 'SALE' THEN debit_amount ELSE 0 END), 0) -
         COALESCE(SUM(CASE WHEN voucher_type IN ('CREDIT_NOTE', 'SALES_RETURN') THEN credit_amount ELSE 0 END), 0) as sales_amount
       FROM ledger_entries
-      WHERE party_type = 'CUSTOMER' AND party_id = ? AND entry_date BETWEEN ? AND ? AND voucher_type IN ('SALE', 'CREDIT_NOTE', 'SALES_RETURN')
+      WHERE party_type = 'CUSTOMER' 
+        AND (party_id = ? OR UPPER(TRIM(party_name)) = UPPER(TRIM(?)))
+        AND entry_date BETWEEN ? AND ? 
+        AND voucher_type IN ('SALE', 'CREDIT_NOTE', 'SALES_RETURN')
     `);
 
     const getJamaStmt = db.prepare(`
       SELECT COALESCE(SUM(credit_amount), 0) as jama_amount
       FROM ledger_entries
-      WHERE party_type = 'CUSTOMER' AND party_id = ? AND entry_date BETWEEN ? AND ? AND voucher_type IN ('PAYMENT_RECEIVED', 'PAYMENT_IN')
+      WHERE party_type = 'CUSTOMER' 
+        AND (party_id = ? OR UPPER(TRIM(party_name)) = UPPER(TRIM(?)))
+        AND entry_date BETWEEN ? AND ? 
+        AND voucher_type IN ('PAYMENT_RECEIVED', 'PAYMENT_IN')
     `);
 
     let totOpening = 0.0;
@@ -1191,11 +1199,11 @@ export const reportService = {
 
     const rows = customers.map((c, index) => {
       const initOp = Number(c.opening_balance) || 0.0;
-      const opLedger = getOpLedgerStmt.get(c.id, startDate).balance;
+      const opLedger = getOpLedgerStmt.get(c.id, c.name, startDate).balance;
       const opening = initOp + opLedger;
 
-      const salesAmt = getSalesStmt.get(c.id, startDate, endDate).sales_amount;
-      const jamaAmt = getJamaStmt.get(c.id, startDate, endDate).jama_amount;
+      const salesAmt = getSalesStmt.get(c.id, c.name, startDate, endDate).sales_amount;
+      const jamaAmt = getJamaStmt.get(c.id, c.name, startDate, endDate).jama_amount;
       const closing = opening + salesAmt - jamaAmt;
 
       totOpening += opening;
@@ -1247,7 +1255,9 @@ export const reportService = {
     const getOpLedgerStmt = db.prepare(`
       SELECT COALESCE(SUM(credit_amount - debit_amount), 0) as balance
       FROM ledger_entries
-      WHERE party_type = 'SUPPLIER' AND party_id = ? AND entry_date < ?
+      WHERE party_type = 'SUPPLIER' 
+        AND (party_id = ? OR UPPER(TRIM(party_name)) = UPPER(TRIM(?)))
+        AND entry_date < ?
     `);
 
     const getPurchaseStmt = db.prepare(`
@@ -1255,13 +1265,19 @@ export const reportService = {
         COALESCE(SUM(CASE WHEN voucher_type = 'PURCHASE' THEN credit_amount ELSE 0 END), 0) -
         COALESCE(SUM(CASE WHEN voucher_type IN ('DEBIT_NOTE', 'PURCHASE_RETURN') THEN debit_amount ELSE 0 END), 0) as purchase_amount
       FROM ledger_entries
-      WHERE party_type = 'SUPPLIER' AND party_id = ? AND entry_date BETWEEN ? AND ? AND voucher_type IN ('PURCHASE', 'DEBIT_NOTE', 'PURCHASE_RETURN')
+      WHERE party_type = 'SUPPLIER' 
+        AND (party_id = ? OR UPPER(TRIM(party_name)) = UPPER(TRIM(?)))
+        AND entry_date BETWEEN ? AND ? 
+        AND voucher_type IN ('PURCHASE', 'DEBIT_NOTE', 'PURCHASE_RETURN')
     `);
 
     const getPaidStmt = db.prepare(`
       SELECT COALESCE(SUM(debit_amount), 0) as paid_amount
       FROM ledger_entries
-      WHERE party_type = 'SUPPLIER' AND party_id = ? AND entry_date BETWEEN ? AND ? AND voucher_type IN ('PAYMENT_MADE', 'PAYMENT_OUT')
+      WHERE party_type = 'SUPPLIER' 
+        AND (party_id = ? OR UPPER(TRIM(party_name)) = UPPER(TRIM(?)))
+        AND entry_date BETWEEN ? AND ? 
+        AND voucher_type IN ('PAYMENT_MADE', 'PAYMENT_OUT')
     `);
 
     let totOpening = 0.0;
@@ -1271,11 +1287,11 @@ export const reportService = {
 
     const rows = suppliers.map((s, index) => {
       const initOp = Number(s.opening_balance) || 0.0;
-      const opLedger = getOpLedgerStmt.get(s.id, startDate).balance;
+      const opLedger = getOpLedgerStmt.get(s.id, s.name, startDate).balance;
       const opening = initOp + opLedger;
 
-      const purAmt = getPurchaseStmt.get(s.id, startDate, endDate).purchase_amount;
-      const paidAmt = getPaidStmt.get(s.id, startDate, endDate).paid_amount;
+      const purAmt = getPurchaseStmt.get(s.id, s.name, startDate, endDate).purchase_amount;
+      const paidAmt = getPaidStmt.get(s.id, s.name, startDate, endDate).paid_amount;
       const closing = opening + purAmt - paidAmt;
 
       totOpening += opening;
