@@ -428,8 +428,11 @@ export const AdvanceOrderModal: React.FC<AdvanceOrderModalProps> = ({
     setVenueSearchQuery(formattedVenue);
     setDeliveryAddress(`${loc.address}${loc.area_landmark ? ' (' + loc.area_landmark + ')' : ''}`);
     const mult = tripType === 'ONE_WAY' ? 0.5 : 1.0;
-    if (loc.customer_charge) setCustomerDeliveryCharge(Math.round(loc.customer_charge * mult));
-    if (loc.driver_rent) setDriverDeliveryRate(Math.round(loc.driver_rent * mult));
+    const custCharge = Number(loc.customer_charge ?? 0);
+    const drivRent = Number(loc.driver_rent ?? 0);
+
+    setCustomerDeliveryCharge(Math.round(custCharge * mult));
+    setDriverDeliveryRate(Math.round(drivRent * mult));
     setIsVenueDropdownOpen(false);
   };
 
@@ -2067,8 +2070,15 @@ export const AdvanceOrderModal: React.FC<AdvanceOrderModalProps> = ({
         initialVenueName={venueSearchQuery}
         onClose={() => setIsAddNewVenueOpen(false)}
         onSuccess={(newLoc) => {
-          setLocations(prev => [...prev, newLoc]);
-          handleSelectVenueLocation(newLoc);
+          setIsAddNewVenueOpen(false);
+          api.getDeliveryLocations().then(locs => {
+            setLocations(locs || []);
+            const found = locs.find(l => l.id === newLoc.id) || newLoc;
+            handleSelectVenueLocation(found);
+          }).catch(() => {
+            setLocations(prev => [...prev, newLoc]);
+            handleSelectVenueLocation(newLoc);
+          });
         }}
       />
     </div>

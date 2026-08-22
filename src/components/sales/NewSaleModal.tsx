@@ -637,14 +637,11 @@ export const NewSaleModal: React.FC<NewSaleModalProps> = ({
     setIsVenueDropdownOpen(false);
 
     const mult = tripType === 'ONE_WAY' ? 0.5 : 1.0;
-    if (loc.customer_charge !== undefined && Number(loc.customer_charge) > 0) {
-      setDeliveryCharge(Math.round(Number(loc.customer_charge) * mult));
-    }
-    if (loc.driver_rent !== undefined && Number(loc.driver_rent) > 0) {
-      setRickshawRent(Math.round(Number(loc.driver_rent) * mult));
-    }
+    const custCharge = Number(loc.customer_charge ?? 0);
+    const drivRent = Number(loc.driver_rent ?? 0);
 
-    matchAndApplyArea(`${loc.venue_name} ${loc.address} ${loc.area_landmark || ''}`, tripType);
+    setDeliveryCharge(Math.round(custCharge * mult));
+    setRickshawRent(Math.round(drivRent * mult));
   };
 
   const handleDriverChange = (drvId: string) => {
@@ -2316,8 +2313,15 @@ export const NewSaleModal: React.FC<NewSaleModalProps> = ({
         initialVenueName={venueSearchQuery}
         onClose={() => setIsAddNewVenueOpen(false)}
         onSuccess={(newLoc) => {
-          setLocations(prev => [...prev, newLoc]);
-          handleSelectVenueLocation(newLoc);
+          setIsAddNewVenueOpen(false);
+          api.getDeliveryLocations().then(locs => {
+            setLocations(locs || []);
+            const found = locs.find(l => l.id === newLoc.id) || newLoc;
+            handleSelectVenueLocation(found);
+          }).catch(() => {
+            setLocations(prev => [...prev, newLoc]);
+            handleSelectVenueLocation(newLoc);
+          });
         }}
       />
     </div>
