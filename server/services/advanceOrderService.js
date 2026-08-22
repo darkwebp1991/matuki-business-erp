@@ -324,8 +324,8 @@ export const advanceOrderService = {
 
     // Insert Items
     const insertItemStmt = db.prepare(`
-      INSERT INTO advance_order_items (order_id, product_id, item_name, quantity, unit, rate, total_amount, notes)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO advance_order_items (order_id, product_id, item_name, quantity, unit, rate, total_amount, notes, vasan_type, vasan_qty)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     for (const itm of items) {
@@ -340,7 +340,9 @@ export const advanceOrderService = {
         itm.unit || 'KG',
         rate,
         itmTotal,
-        itm.notes || ''
+        itm.notes || '',
+        itm.vasan_type || 'NONE',
+        Number(itm.vasan_qty) || 0
       );
     }
 
@@ -438,8 +440,8 @@ export const advanceOrderService = {
     if (data.items && Array.isArray(data.items)) {
       db.prepare('DELETE FROM advance_order_items WHERE order_id = ?').run(Number(id));
       const insertItemStmt = db.prepare(`
-        INSERT INTO advance_order_items (order_id, product_id, item_name, quantity, unit, rate, total_amount, notes)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO advance_order_items (order_id, product_id, item_name, quantity, unit, rate, total_amount, notes, vasan_type, vasan_qty)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `);
       for (const itm of data.items) {
         const qty = Number(itm.quantity) || 0;
@@ -453,7 +455,9 @@ export const advanceOrderService = {
           itm.unit || 'KG',
           rate,
           itmTotal,
-          itm.notes || ''
+          itm.notes || '',
+          itm.vasan_type || 'NONE',
+          Number(itm.vasan_qty) || 0
         );
       }
     }

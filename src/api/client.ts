@@ -230,6 +230,8 @@ export const api = {
   getCustomerSmartRecommendations: (customerId: number) => request<{
     frequentVenues: Array<{ venue_name: string; usage_count: number; address?: string; area_landmark?: string; customer_charge?: number; driver_rent?: number }>;
     frequentProducts: Array<{ product_id: number | null; item_name: string; order_count: number; total_qty: number; unit: string; rate: number; code?: string }>;
+    frequentDriver?: { id: number; name: string; mobile?: string; usage_count: number } | null;
+    productVasanMap?: Record<string | number, string>;
   }>(`/customers/${customerId}/smart-recommendations`),
 
   getSuppliers: (params: any = {}) => {

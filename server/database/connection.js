@@ -47,6 +47,10 @@ export function getDatabase() {
     dbInstance.exec('PRAGMA cache_size = -64000;');
     dbInstance.exec('PRAGMA temp_store = MEMORY;');
     dbInstance.exec('PRAGMA mmap_size = 268435456;');
+
+    // Safe column migrations for advance order items vasan tracking
+    try { dbInstance.exec("ALTER TABLE advance_order_items ADD COLUMN vasan_type TEXT DEFAULT 'NONE';"); } catch (e) {}
+    try { dbInstance.exec("ALTER TABLE advance_order_items ADD COLUMN vasan_qty REAL DEFAULT 0;"); } catch (e) {}
   }
   return dbInstance;
 }

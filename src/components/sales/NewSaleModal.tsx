@@ -114,6 +114,7 @@ export const NewSaleModal: React.FC<NewSaleModalProps> = ({
   // AI Smart Recommendation State
   const [frequentVenues, setFrequentVenues] = useState<Array<{ venue_name: string; usage_count: number; address?: string; area_landmark?: string; customer_charge?: number; driver_rent?: number }>>([]);
   const [frequentProducts, setFrequentProducts] = useState<Array<{ product_id: number | null; item_name: string; order_count: number; total_qty: number; unit: string; rate: number; code?: string }>>([]);
+  const [productVasanMap, setProductVasanMap] = useState<Record<string | number, string>>({});
 
   // Vasan Master Rates
   const [vasanMasterList, setVasanMasterList] = useState<VasanMasterItem[]>([]);
@@ -400,6 +401,9 @@ export const NewSaleModal: React.FC<NewSaleModalProps> = ({
         if (res) {
           setFrequentVenues(res.frequentVenues || []);
           setFrequentProducts(res.frequentProducts || []);
+          if (res.productVasanMap) {
+            setProductVasanMap(res.productVasanMap);
+          }
           if (res.frequentVenues && res.frequentVenues.length > 0 && !deliveryVenue) {
             const top = res.frequentVenues[0];
             setDeliveryVenue(top.venue_name);
@@ -407,6 +411,10 @@ export const NewSaleModal: React.FC<NewSaleModalProps> = ({
             if (top.address) setDeliveryAddress(top.address);
             if (top.customer_charge) setDeliveryCharge(top.customer_charge);
             if (top.driver_rent) setRickshawRent(top.driver_rent);
+          }
+          if (res.frequentDriver && res.frequentDriver.id && !selectedDriverId) {
+            setSelectedDriverId(String(res.frequentDriver.id));
+            setDriverName(res.frequentDriver.name);
           }
         }
       }).catch(console.error);
@@ -679,20 +687,19 @@ export const NewSaleModal: React.FC<NewSaleModalProps> = ({
     const discPct = Number(updated[index].discount_pct || 0);
     const amt = (qty * rate) * (1 - discPct / 100);
 
-    let suggestedVasan = 'NONE';
-    let suggestedVasanQty = 0;
-    const lowerName = prod.name.toLowerCase();
+    const getSmartVasanType = (p: Product) => {
+      if (p.id && productVasanMap[p.id]) return productVasanMap[p.id];
+      if (p.name && productVasanMap[p.name.toLowerCase().trim()]) return productVasanMap[p.name.toLowerCase().trim()];
+      const lName = p.name.toLowerCase();
+      if (p.unit === 'POUCH' || lName.includes('pouch') || lName.includes('bottle') || lName.includes('dahi') || lName.includes('chaas')) return 'Carat';
+      if (lName.includes('jamun') || lName.includes('gulab') || lName.includes('rasgulla')) return 'Dol';
+      if (lName.includes('matho') || lName.includes('shrikhand') || lName.includes('rabdi') || lName.includes('basundi') || lName.includes('kheer') || lName.includes('syrup')) return 'Milton';
+      if (lName.includes('barfi') || lName.includes('penda') || lName.includes('kaju') || lName.includes('katli') || lName.includes('ladu') || lName.includes('choki')) return 'Choki';
+      return 'NONE';
+    };
 
-    if (lowerName.includes('jamun') || lowerName.includes('gulab') || lowerName.includes('rasgulla')) {
-      suggestedVasan = 'Dol';
-      suggestedVasanQty = Math.ceil(qty / 10) || 1;
-    } else if (lowerName.includes('matho') || lowerName.includes('shrikhand') || lowerName.includes('syrup')) {
-      suggestedVasan = 'Milton';
-      suggestedVasanQty = Math.ceil(qty / 20) || 1;
-    } else if (lowerName.includes('kaju') || lowerName.includes('katli') || lowerName.includes('peda') || lowerName.includes('barfi') || lowerName.includes('ladu')) {
-      suggestedVasan = 'Choki';
-      suggestedVasanQty = Math.ceil(qty / 5) || 1;
-    }
+    const suggestedVasan = getSmartVasanType(prod);
+    const suggestedVasanQty = suggestedVasan !== 'NONE' ? (Math.ceil(qty / 15) || 1) : 0;
 
     updated[index] = {
       ...updated[index],

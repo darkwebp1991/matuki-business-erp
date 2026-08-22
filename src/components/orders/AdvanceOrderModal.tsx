@@ -110,6 +110,7 @@ export const AdvanceOrderModal: React.FC<AdvanceOrderModalProps> = ({
   // AI Smart Recommendation State
   const [frequentVenues, setFrequentVenues] = useState<Array<{ venue_name: string; usage_count: number; address?: string; area_landmark?: string; customer_charge?: number; driver_rent?: number }>>([]);
   const [frequentProducts, setFrequentProducts] = useState<Array<{ product_id: number | null; item_name: string; order_count: number; total_qty: number; unit: string; rate: number; code?: string }>>([]);
+  const [productVasanMap, setProductVasanMap] = useState<Record<string | number, string>>({});
 
   // Party-Wise Last Billed Item Rates Map
   const [customerLastRates, setCustomerLastRates] = useState<Record<number, { rate: number; discount: number; last_date: string; invoice_no: string }>>({});
@@ -327,11 +328,14 @@ export const AdvanceOrderModal: React.FC<AdvanceOrderModalProps> = ({
       setCustomerLastRates({});
       return;
     }
-    // Fetch AI Smart Recommendations (Venues & Products)
+    // Fetch AI Smart Recommendations (Venues, Products, Driver & Vasan preferences)
     api.getCustomerSmartRecommendations(cId).then(res => {
       if (res) {
         setFrequentVenues(res.frequentVenues || []);
         setFrequentProducts(res.frequentProducts || []);
+        if (res.productVasanMap) {
+          setProductVasanMap(res.productVasanMap);
+        }
         if (res.frequentVenues && res.frequentVenues.length > 0 && !deliveryVenue) {
           const top = res.frequentVenues[0];
           setDeliveryVenue(top.venue_name);
@@ -339,6 +343,9 @@ export const AdvanceOrderModal: React.FC<AdvanceOrderModalProps> = ({
           if (top.address) setDeliveryAddress(top.address);
           if (top.customer_charge) setCustomerDeliveryCharge(top.customer_charge);
           if (top.driver_rent) setDriverDeliveryRate(top.driver_rent);
+        }
+        if (res.frequentDriver && res.frequentDriver.id && !selectedDriverId) {
+          setSelectedDriverId(String(res.frequentDriver.id));
         }
       }
     }).catch(console.error);
@@ -454,6 +461,16 @@ export const AdvanceOrderModal: React.FC<AdvanceOrderModalProps> = ({
     setItems(updated);
   };
 
+  const getSmartVasanType = (prod: Product) => {
+    if (prod.id && productVasanMap[prod.id]) return productVasanMap[prod.id];
+    if (prod.name && productVasanMap[prod.name.toLowerCase().trim()]) return productVasanMap[prod.name.toLowerCase().trim()];
+    const name = prod.name.toLowerCase();
+    if (prod.unit === 'POUCH' || name.includes('pouch') || name.includes('bottle') || name.includes('dahi') || name.includes('chaas')) return 'Carat';
+    if (name.includes('matho') || name.includes('shrikhand') || name.includes('rabdi') || name.includes('basundi') || name.includes('kheer')) return 'Milton';
+    if (name.includes('barfi') || name.includes('penda') || name.includes('kaju') || name.includes('katli') || name.includes('laddoo') || name.includes('choki')) return 'Choki';
+    return 'NONE';
+  };
+
   const handleSelectProduct = (index: number, prod: Product | null) => {
     if (!prod) return;
     const updated = [...items];
@@ -465,6 +482,9 @@ export const AdvanceOrderModal: React.FC<AdvanceOrderModalProps> = ({
     const gross = qty * rate;
     const discountVal = gross * (disc / 100);
 
+    const smartVasan = (current.vasan_type && current.vasan_type !== 'NONE') ? current.vasan_type : getSmartVasanType(prod);
+    const vasanQty = smartVasan !== 'NONE' ? Math.max(1, Math.ceil(qty / 15)) : '';
+
     updated[index] = {
       ...current,
       product_id: prod.id,
@@ -473,8 +493,8 @@ export const AdvanceOrderModal: React.FC<AdvanceOrderModalProps> = ({
       unit: prod.unit || 'KG',
       rate: rate,
       quantity: qty,
-      vasan_type: current.vasan_type || 'NONE',
-      vasan_qty: current.vasan_qty || '',
+      vasan_type: smartVasan,
+      vasan_qty: vasanQty,
       amount: Math.round((gross - discountVal) * 100) / 100
     };
 

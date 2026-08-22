@@ -271,9 +271,65 @@ export const partyService = {
       console.error('Error fetching frequent products:', err);
     }
 
+    // 3. Most Frequently Used Rickshaw Driver for this Customer
+    let frequentDriver = null;
+    try {
+      const driverQuery = `
+        SELECT driver_id, COUNT(*) as usage_count FROM (
+          SELECT driver_id FROM sales WHERE (customer_id = ? OR (customer_name = ? AND ? != '')) AND driver_id IS NOT NULL AND driver_id != 0
+          UNION ALL
+          SELECT driver_id FROM advance_orders WHERE (customer_id = ? OR (customer_name = ? AND ? != '')) AND driver_id IS NOT NULL AND driver_id != 0
+        )
+        GROUP BY driver_id
+        ORDER BY usage_count DESC
+        LIMIT 1
+      `;
+      const topDrv = db.prepare(driverQuery).get(cId, cName, cName, cId, cName, cName);
+      if (topDrv && topDrv.driver_id) {
+        const drvInfo = db.prepare('SELECT id, name, mobile FROM drivers WHERE id = ?').get(topDrv.driver_id);
+        if (drvInfo) {
+          frequentDriver = {
+            id: drvInfo.id,
+            name: drvInfo.name,
+            mobile: drvInfo.mobile,
+            usage_count: topDrv.usage_count
+          };
+        }
+      }
+    } catch (err) {
+      console.error('Error fetching frequent driver:', err);
+    }
+
+    // 4. Product Vasan Preferences Memory
+    let productVasanMap = {};
+    try {
+      const vasanQuery = `
+        SELECT product_id, item_name, vasan_type, COUNT(*) as cnt FROM (
+          SELECT product_id, product_name as item_name, vasan_type FROM sale_items WHERE vasan_type IS NOT NULL AND vasan_type != 'NONE' AND vasan_type != ''
+          UNION ALL
+          SELECT product_id, item_name, vasan_type FROM advance_order_items WHERE vasan_type IS NOT NULL AND vasan_type != 'NONE' AND vasan_type != ''
+        )
+        GROUP BY product_id, item_name, vasan_type
+        ORDER BY cnt DESC
+      `;
+      const vasanRows = db.prepare(vasanQuery).all();
+      for (const row of vasanRows) {
+        if (row.product_id && !productVasanMap[row.product_id]) {
+          productVasanMap[row.product_id] = row.vasan_type;
+        }
+        if (row.item_name && !productVasanMap[row.item_name.toLowerCase().trim()]) {
+          productVasanMap[row.item_name.toLowerCase().trim()] = row.vasan_type;
+        }
+      }
+    } catch (err) {
+      console.error('Error fetching product vasan map:', err);
+    }
+
     return {
       frequentVenues,
-      frequentProducts
+      frequentProducts,
+      frequentDriver,
+      productVasanMap
     };
   },
 
