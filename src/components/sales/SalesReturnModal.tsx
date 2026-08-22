@@ -7,7 +7,10 @@ import {
   CheckCircle2, 
   Package, 
   Truck,
-  Layers
+  Layers,
+  Camera,
+  Trash2,
+  Image as ImageIcon
 } from 'lucide-react';
 import { api } from '../../api/client';
 import { Sale, SaleItem } from '../../types';
@@ -54,9 +57,31 @@ export const SalesReturnModal: React.FC<SalesReturnModalProps> = ({
   const [date, setDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const [refundMode, setRefundMode] = useState<string>('CREDIT_NOTE'); // CREDIT_NOTE, CASH
   const [reason, setReason] = useState<string>('Event Completed - Return unused sweets & Vasan');
+  const [photoBase64, setPhotoBase64] = useState<string>('');
+  const [photoPreviewUrl, setPhotoPreviewUrl] = useState<string>('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [showCloseConfirm, setShowCloseConfirm] = useState(false);
+
+  const handlePhotoFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      setError('Please select a valid image file (JPG, PNG, WebP)');
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      setError('Photo size exceeds 10MB limit');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      const res = reader.result as string;
+      setPhotoBase64(res);
+      setPhotoPreviewUrl(res);
+    };
+    reader.readAsDataURL(file);
+  };
 
   const isDirty = () => {
     const hasSaleSelected = Boolean(selectedSaleId) && (!preselectedSaleId || String(preselectedSaleId) !== selectedSaleId);
@@ -166,11 +191,24 @@ export const SalesReturnModal: React.FC<SalesReturnModalProps> = ({
       setSaving(true);
       setError('');
 
+      let uploadedPhotoUrl = '';
+      if (photoBase64) {
+        try {
+          const uploadRes = await api.uploadSalesReturnPhoto({ image_base64: photoBase64 });
+          if (uploadRes && uploadRes.photo_url) {
+            uploadedPhotoUrl = uploadRes.photo_url;
+          }
+        } catch (uploadErr) {
+          console.error('Error uploading return sweets weight photo:', uploadErr);
+        }
+      }
+
       const result = await api.createSalesReturn({
         sale_id: selectedSale.id,
         date,
         refund_mode: refundMode,
         reason,
+        photo_url: uploadedPhotoUrl || undefined,
         return_items: validSweetReturns.map(i => ({
           product_id: i.product_id,
           product_name: i.product_name,
@@ -281,6 +319,53 @@ export const SalesReturnModal: React.FC<SalesReturnModalProps> = ({
                 <option value="CREDIT_NOTE">Credit Note (Adjust in Khata)</option>
                 <option value="CASH">Cash Refund (Pay from Drawer)</option>
               </select>
+            </div>
+
+            {/* Photo Upload Section for Return Sweets Weight Proof */}
+            <div style={{
+              gridColumn: '1 / -1',
+              marginTop: '6px',
+              padding: '10px 12px',
+              background: '#f0fdf4',
+              border: '1.5px dashed #86efac',
+              borderRadius: '6px'
+            }}>
+              <label style={{ fontSize: '0.82rem', fontWeight: 800, color: '#166534', display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' }}>
+                <Camera size={16} color="#16a34a" /> 📷 Attach Returned Sweets Weight Photo (પરત આવેલા સ્વીટના વજનનો ફોટો)
+              </label>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handlePhotoFileChange}
+                  style={{ fontSize: '0.80rem' }}
+                />
+
+                {photoPreviewUrl && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <img 
+                      src={photoPreviewUrl} 
+                      alt="Weight Proof" 
+                      style={{ width: '56px', height: '56px', objectFit: 'cover', borderRadius: '6px', border: '2px solid #22c55e' }} 
+                    />
+                    <button
+                      type="button"
+                      className="btn btn-secondary btn-sm"
+                      onClick={() => {
+                        setPhotoBase64('');
+                        setPhotoPreviewUrl('');
+                      }}
+                      style={{ fontSize: '0.72rem', padding: '2px 6px', color: '#dc2626' }}
+                    >
+                      <Trash2 size={12} /> Remove
+                    </button>
+                  </div>
+                )}
+              </div>
+              <span style={{ fontSize: '0.72rem', color: '#15803d', display: 'block', marginTop: '4px' }}>
+                💡 Snap or upload a photo of returned sweets on the weighing scale. Stored as permanent proof for customer inquiries!
+              </span>
             </div>
           </div>
 

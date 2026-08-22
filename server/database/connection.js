@@ -48,9 +48,11 @@ export function getDatabase() {
     dbInstance.exec('PRAGMA temp_store = MEMORY;');
     dbInstance.exec('PRAGMA mmap_size = 268435456;');
 
-    // Safe column migrations for advance order items vasan tracking
+    // Safe column migrations for advance order items vasan tracking & credit note photos
     try { dbInstance.exec("ALTER TABLE advance_order_items ADD COLUMN vasan_type TEXT DEFAULT 'NONE';"); } catch (e) {}
     try { dbInstance.exec("ALTER TABLE advance_order_items ADD COLUMN vasan_qty REAL DEFAULT 0;"); } catch (e) {}
+    try { dbInstance.exec("ALTER TABLE sales_returns ADD COLUMN photo_url TEXT;"); } catch (e) {}
+    try { dbInstance.exec("ALTER TABLE purchase_returns ADD COLUMN photo_url TEXT;"); } catch (e) {}
   }
   return dbInstance;
 }

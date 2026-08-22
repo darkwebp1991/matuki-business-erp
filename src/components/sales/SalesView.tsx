@@ -27,6 +27,7 @@ import { NewSaleModal } from './NewSaleModal';
 import { InvoicePrintModal } from './InvoicePrintModal';
 import { InvoiceDetailsModal } from './InvoiceDetailsModal';
 import { SalesReturnModal } from './SalesReturnModal';
+import { CreditNoteDetailsModal } from './CreditNoteDetailsModal';
 import { DriverTripModal } from './DriverTripModal';
 import { PaymentModal } from '../parties/PaymentModal';
 import { MasterPinDialog } from '../common/MasterPinDialog';
@@ -49,6 +50,8 @@ export const SalesView: React.FC<SalesViewProps> = ({ currentUser }) => {
   const [duplicateSaleData, setDuplicateSaleData] = useState<Sale | null>(null);
   const [pinConfirmSale, setPinConfirmSale] = useState<Sale | null>(null);
   const [isSalesReturnOpen, setIsSalesReturnOpen] = useState(false);
+  const [selectedCreditNoteId, setSelectedCreditNoteId] = useState<number | null>(null);
+  const [isCreditNoteDetailsOpen, setIsCreditNoteDetailsOpen] = useState<boolean>(false);
   const [isDriverTripOpen, setIsDriverTripOpen] = useState(false);
   const [selectedInvoiceDetailsId, setSelectedInvoiceDetailsId] = useState<number | null>(null);
   const [printInvoiceId, setPrintInvoiceId] = useState<number | null>(null);
@@ -586,8 +589,24 @@ export const SalesView: React.FC<SalesViewProps> = ({ currentUser }) => {
           onSuccess={(result) => {
             setIsSalesReturnOpen(false);
             fetchSales();
-            alert(`Sales Return #${result.return_no} recorded successfully! Total: ₹${result.total_amount}${result.vasan_returned ? ' (Vasan Returned: ' + result.vasan_returned + ')' : ''}`);
+            const retId = result?.id || result?.return_id;
+            if (retId) {
+              setSelectedCreditNoteId(retId);
+              setIsCreditNoteDetailsOpen(true);
+            }
           }}
+        />
+      )}
+
+      {isCreditNoteDetailsOpen && selectedCreditNoteId && (
+        <CreditNoteDetailsModal
+          isOpen={isCreditNoteDetailsOpen}
+          returnId={selectedCreditNoteId}
+          onClose={() => {
+            setIsCreditNoteDetailsOpen(false);
+            setSelectedCreditNoteId(null);
+          }}
+          onRefresh={fetchSales}
         />
       )}
 

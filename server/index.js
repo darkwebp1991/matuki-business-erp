@@ -592,15 +592,40 @@ const server = http.createServer(async (req, res) => {
       return sendJson(res, 200, { success: true, data: result });
     }
 
-    // --- SALES RETURNS WITH VASAN RETURN ---
+    // --- SALES RETURNS WITH VASAN RETURN & WEIGHT PHOTO ATTACHMENT ---
     if (pathname === '/api/sales-returns' && method === 'GET') {
       const returns = salesService.getSalesReturns(query);
       return sendJson(res, 200, { success: true, data: returns });
+    }
+    if (pathname.match(/^\/api\/sales-returns\/(\d+)$/) && method === 'GET') {
+      const id = pathname.split('/')[3];
+      const ret = salesService.getSalesReturnById(id);
+      return sendJson(res, 200, { success: true, data: ret });
     }
     if (pathname === '/api/sales-returns' && method === 'POST') {
       const body = await parseBody(req);
       const ret = salesService.createSalesReturn(body, body.username || 'Cashier');
       return sendJson(res, 201, { success: true, data: ret });
+    }
+    if (pathname === '/api/sales-returns/upload-photo' && method === 'POST') {
+      const body = await parseBody(req);
+      if (!body.image_base64) {
+        return sendError(res, 400, 'Image data is required');
+      }
+      const base64Data = body.image_base64.replace(/^data:image\/\w+;base64,/, '');
+      const buffer = Buffer.from(base64Data, 'base64');
+      const filename = `return_sweets_photo_${Date.now()}_${Math.floor(Math.random()*1000)}.jpg`;
+
+      const publicDir = path.join(process.cwd(), 'public', 'uploads');
+      if (!fs.existsSync(publicDir)) fs.mkdirSync(publicDir, { recursive: true });
+
+      fs.writeFileSync(path.join(publicDir, filename), buffer);
+      const photoUrl = `/uploads/${filename}`;
+
+      if (body.return_id) {
+        salesService.updateSalesReturnPhoto(body.return_id, photoUrl);
+      }
+      return sendJson(res, 200, { success: true, photo_url: photoUrl });
     }
 
     // --- RICKSHAW DRIVERS & DELIVERY LOCATIONS ---

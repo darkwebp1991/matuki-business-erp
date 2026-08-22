@@ -312,12 +312,17 @@ export const api = {
     body: JSON.stringify({ date, partners, image_base64: imageBase64 })
   }),
 
-  // Sales Returns with Vasan Return
+  // Sales Returns with Vasan Return & Weight Photo
   getSalesReturns: (params: any = {}) => {
     const q = new URLSearchParams(params).toString();
     return request<any[]>(`/sales-returns${q ? `?${q}` : ''}`);
   },
+  getSalesReturnById: (id: number) => request<any>(`/sales-returns/${id}`),
   createSalesReturn: (data: any) => request<any>('/sales-returns', {
+    method: 'POST',
+    body: JSON.stringify(data)
+  }),
+  uploadSalesReturnPhoto: (data: { return_id?: number; image_base64: string }) => request<any>('/sales-returns/upload-photo', {
     method: 'POST',
     body: JSON.stringify(data)
   }),

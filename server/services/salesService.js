@@ -1155,6 +1155,39 @@ export const salesService = {
     return db.prepare('SELECT * FROM sales_returns ORDER BY date DESC, id DESC').all();
   },
 
+  getSalesReturnById(id) {
+    const db = getDatabase();
+    const ret = db.prepare('SELECT * FROM sales_returns WHERE id = ?').get(id);
+    if (!ret) return null;
+
+    const items = db.prepare(`
+      SELECT sri.*, p.name as product_name, p.code as product_code
+      FROM sales_return_items sri
+      LEFT JOIN products p ON sri.product_id = p.id
+      WHERE sri.return_id = ?
+    `).all(id);
+
+    let customer = null;
+    if (ret.customer_id) {
+      customer = db.prepare('SELECT * FROM customers WHERE id = ?').get(ret.customer_id);
+    }
+
+    const sale = db.prepare('SELECT * FROM sales WHERE id = ?').get(ret.sale_id);
+
+    return {
+      ...ret,
+      items,
+      customer,
+      sale
+    };
+  },
+
+  updateSalesReturnPhoto(id, photo_url) {
+    const db = getDatabase();
+    db.prepare('UPDATE sales_returns SET photo_url = ? WHERE id = ?').run(photo_url, id);
+    return this.getSalesReturnById(id);
+  },
+
   // ----------------------------------------------------
   // VASAN YADI (વાસણ યાદી) & CHARGE MISSING VASAN TO CUSTOMER
   // ----------------------------------------------------
