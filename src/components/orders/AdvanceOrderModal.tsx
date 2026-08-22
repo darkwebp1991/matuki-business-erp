@@ -133,8 +133,8 @@ export const AdvanceOrderModal: React.FC<AdvanceOrderModalProps> = ({
     quantity: '',
     rate: '',
     discount_pct: 0,
-    vasan_type: 'Milton',
-    vasan_qty: 1,
+    vasan_type: 'NONE',
+    vasan_qty: '',
     amount: 0,
     notes: ''
   });
@@ -227,8 +227,8 @@ export const AdvanceOrderModal: React.FC<AdvanceOrderModalProps> = ({
             quantity: qty,
             rate: rate,
             discount_pct: 0,
-            vasan_type: 'Milton',
-            vasan_qty: Math.max(1, Math.ceil(qty / 15)),
+            vasan_type: 'NONE',
+            vasan_qty: '',
             amount: Math.round(qty * rate * 100) / 100,
             notes: it.notes || ''
           };
@@ -418,8 +418,8 @@ export const AdvanceOrderModal: React.FC<AdvanceOrderModalProps> = ({
       unit: prod.unit || 'KG',
       rate: rate,
       quantity: qty,
-      vasan_type: prod.unit === 'POUCH' ? 'Carat' : 'Milton',
-      vasan_qty: Math.max(1, Math.ceil(qty / 15)),
+      vasan_type: current.vasan_type || 'NONE',
+      vasan_qty: current.vasan_qty || '',
       amount: Math.round((gross - discountVal) * 100) / 100
     };
 

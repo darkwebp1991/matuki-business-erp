@@ -257,6 +257,15 @@ export function App() {
   // Global Vyapar Keyboard Shortcuts (F2 / Alt+S for Sale, Alt+P for Purchase, Alt+R for Payment In, Alt+E for Expense)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      const activeEl = document.activeElement;
+      const isInputOrModal = activeEl && (
+        activeEl.tagName === 'INPUT' || 
+        activeEl.tagName === 'TEXTAREA' || 
+        activeEl.tagName === 'SELECT' ||
+        Boolean(activeEl.closest('[style*="position: fixed"], [style*="position:fixed"]'))
+      );
+      if (isInputOrModal) return;
+
       if (e.key === 'F2' || (e.altKey && e.key.toLowerCase() === 's')) {
         e.preventDefault();
         setConvertingAdvanceOrder(null);
@@ -387,6 +396,7 @@ export function App() {
               settings={settings}
               currentUser={currentUser}
               onConvertToSale={handleConvertToSale}
+              onNavigate={(mod) => setActiveModule(mod)}
             />
           )}
 

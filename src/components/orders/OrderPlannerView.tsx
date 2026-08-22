@@ -39,12 +39,14 @@ interface OrderPlannerViewProps {
   settings?: BusinessSettings | null;
   onConvertToSale: (order: AdvanceOrder) => void;
   currentUser?: User | null;
+  onNavigate?: (module: any) => void;
 }
 
 export const OrderPlannerView: React.FC<OrderPlannerViewProps> = ({
   settings,
   onConvertToSale,
-  currentUser
+  currentUser,
+  onNavigate
 }) => {
   const todayStr = new Date().toISOString().split('T')[0];
 
@@ -742,8 +744,8 @@ export const OrderPlannerView: React.FC<OrderPlannerViewProps> = ({
           onSuccess={(savedOrder) => {
             setIsModalOpen(false);
             setEditingOrder(null);
-            if (savedOrder && savedOrder.delivery_date && savedOrder.delivery_date !== selectedDate) {
-              setSelectedDate(savedOrder.delivery_date);
+            if (onNavigate) {
+              onNavigate('dashboard');
             } else {
               fetchOrders();
             }
