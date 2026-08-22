@@ -1,6 +1,7 @@
 import { getDatabase, runInTransaction } from '../database/connection.js';
 import { settingsService } from './settingsService.js';
 import { autoInvoiceDispatchService } from './autoInvoiceDispatchService.js';
+import { partyService } from './partyService.js';
 
 // Standard Replacement / Missing Container Valuation
 export const VASAN_DEFAULT_RATES = {
