@@ -36,6 +36,8 @@ import { VasanMasterModal } from '../settings/VasanMasterModal';
 import { Box } from 'lucide-react';
 
 export type ReportKey =
+  | 'sale_history'
+  | 'purchase_history'
   | 'sale'
   | 'purchase'
   | 'day_book'
@@ -101,6 +103,12 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ settings: propSettings
       let data: any = null;
 
       switch (selectedReport) {
+        case 'sale_history':
+          data = await api.getSaleHistoryReport({ startDate, endDate });
+          break;
+        case 'purchase_history':
+          data = await api.getPurchaseHistoryReport({ startDate, endDate });
+          break;
         case 'party_statement':
           if (selectedPartyId) {
             data = await api.getPartyLedgerStatement(selectedPartyType, selectedPartyId, startDate, endDate);
@@ -363,8 +371,47 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ settings: propSettings
     (p.code && p.code.toLowerCase().includes(partySearchQuery.toLowerCase()))
   );
 
+  const handleDatePreset = (preset: 'TODAY' | 'THIS_MONTH' | 'LAST_MONTH' | 'THIS_YEAR' | 'ALL_TIME') => {
+    const now = new Date();
+    const todayStr = now.toISOString().split('T')[0];
+
+    if (preset === 'TODAY') {
+      setStartDate(todayStr);
+      setEndDate(todayStr);
+    } else if (preset === 'THIS_MONTH') {
+      const year = now.getFullYear();
+      const month = String(now.getMonth() + 1).padStart(2, '0');
+      setStartDate(`${year}-${month}-01`);
+      setEndDate(todayStr);
+    } else if (preset === 'LAST_MONTH') {
+      const firstDayLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+      const lastDayLastMonth = new Date(now.getFullYear(), now.getMonth(), 0);
+      setStartDate(firstDayLastMonth.toISOString().split('T')[0]);
+      setEndDate(lastDayLastMonth.toISOString().split('T')[0]);
+    } else if (preset === 'THIS_YEAR') {
+      const year = now.getFullYear();
+      setStartDate(`${year}-01-01`);
+      setEndDate(`${year}-12-31`);
+    } else if (preset === 'ALL_TIME') {
+      setStartDate('2022-01-01');
+      setEndDate(todayStr);
+    }
+  };
+
   // Report Tree Navigation items
   const reportSections = [
+    {
+      title: 'Party Summary & History',
+      items: [
+        { id: 'sale_history' as ReportKey, label: '📈 SALE REPORT (ગ્રાહક વેચાણ હિસાબ)' },
+        { id: 'purchase_history' as ReportKey, label: '📉 PURCHASE REPORT (સપ્લાયર ખરીદી હિસાબ)' },
+        { id: 'party_statement' as ReportKey, label: '📑 Party Statement & Ledger' },
+        { id: 'party_wise_profit' as ReportKey, label: 'Party wise Profit & Loss' },
+        { id: 'all_parties' as ReportKey, label: 'All parties' },
+        { id: 'party_report_by_item' as ReportKey, label: 'Party Report By Item' },
+        { id: 'sale_purchase_by_party' as ReportKey, label: 'Sale Purchase By Party' }
+      ]
+    },
     {
       title: 'Transaction report',
       items: [
@@ -385,16 +432,6 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ settings: propSettings
         { id: 'vasan_yadi' as ReportKey, label: '🥣 Utensil & Container Tracker' },
         { id: 'driver_trips' as ReportKey, label: '🛺 Rickshaw Driver Deliveries & Rent' },
         { id: 'vasan_tracker' as ReportKey, label: '📦 All Container Records' }
-      ]
-    },
-    {
-      title: 'Party Statement',
-      items: [
-        { id: 'party_statement' as ReportKey, label: '📑 Party Statement & Ledger' },
-        { id: 'party_wise_profit' as ReportKey, label: 'Party wise Profit & Loss' },
-        { id: 'all_parties' as ReportKey, label: 'All parties' },
-        { id: 'party_report_by_item' as ReportKey, label: 'Party Report By Item' },
-        { id: 'sale_purchase_by_party' as ReportKey, label: 'Sale Purchase By Party' }
       ]
     },
     {
@@ -633,46 +670,41 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ settings: propSettings
                 )}
 
                 {/* Quick Date Range Preset Buttons */}
-                <div style={{ display: 'flex', gap: '4px' }}>
+                <div style={{ display: 'flex', gap: '4px', background: '#f1f5f9', padding: '2px', borderRadius: '4px' }}>
                   <button
                     type="button"
-                    className="btn btn-secondary btn-sm"
-                    style={{ padding: '3px 7px', fontSize: '0.72rem' }}
-                    onClick={() => {
-                      const d = new Date();
-                      setStartDate(`${d.toISOString().slice(0, 7)}-01`);
-                      setEndDate(d.toISOString().split('T')[0]);
-                    }}
-                    title="Current month to date"
+                    style={{ padding: '3px 8px', fontSize: '0.72rem', fontWeight: 700, border: 'none', background: 'transparent', cursor: 'pointer', color: '#334155' }}
+                    onClick={() => handleDatePreset('TODAY')}
+                  >
+                    Today
+                  </button>
+                  <button
+                    type="button"
+                    style={{ padding: '3px 8px', fontSize: '0.72rem', fontWeight: 700, border: 'none', background: 'transparent', cursor: 'pointer', color: '#334155' }}
+                    onClick={() => handleDatePreset('THIS_MONTH')}
                   >
                     This Month
                   </button>
                   <button
                     type="button"
-                    className="btn btn-secondary btn-sm"
-                    style={{ padding: '3px 7px', fontSize: '0.72rem' }}
-                    onClick={() => {
-                      const d = new Date();
-                      const prev = new Date(d.getFullYear(), d.getMonth() - 1, 1);
-                      const last = new Date(d.getFullYear(), d.getMonth(), 0);
-                      setStartDate(prev.toISOString().split('T')[0]);
-                      setEndDate(last.toISOString().split('T')[0]);
-                    }}
-                    title="Last full month"
+                    style={{ padding: '3px 8px', fontSize: '0.72rem', fontWeight: 700, border: 'none', background: 'transparent', cursor: 'pointer', color: '#334155' }}
+                    onClick={() => handleDatePreset('LAST_MONTH')}
                   >
                     Last Month
                   </button>
                   <button
                     type="button"
-                    className="btn btn-secondary btn-sm"
-                    style={{ padding: '3px 7px', fontSize: '0.72rem' }}
-                    onClick={() => {
-                      setStartDate('2025-01-01');
-                      setEndDate(new Date().toISOString().split('T')[0]);
-                    }}
-                    title="All historical records"
+                    style={{ padding: '3px 8px', fontSize: '0.72rem', fontWeight: 700, border: 'none', background: 'transparent', cursor: 'pointer', color: '#334155' }}
+                    onClick={() => handleDatePreset('THIS_YEAR')}
                   >
-                    All Time
+                    This Year
+                  </button>
+                  <button
+                    type="button"
+                    style={{ padding: '3px 8px', fontSize: '0.72rem', fontWeight: 700, border: 'none', background: 'transparent', cursor: 'pointer', color: '#334155' }}
+                    onClick={() => handleDatePreset('ALL_TIME')}
+                  >
+                    All
                   </button>
                 </div>
 
@@ -734,6 +766,190 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ settings: propSettings
                 )}
               </div>
             </div>
+
+            {/* --- REPORT: SALE HISTORY (CUSTOMER LEDGER SUMMARY) --- */}
+            {selectedReport === 'sale_history' && reportData && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                <div className="no-print" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontSize: '0.84rem', color: '#475569', fontWeight: 700 }}>
+                    Showing Customer Sales & Collection History ({formatDate(reportData.startDate)} to {formatDate(reportData.endDate)})
+                  </span>
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <button
+                      className="btn btn-secondary btn-sm"
+                      onClick={() => {
+                        const rows = [
+                          ['MATUKI SWEETS - SALE REPORT'],
+                          [`Period: ${formatDate(reportData.startDate)} to ${formatDate(reportData.endDate)}`],
+                          ['SR NO', 'NAME', 'OPENING', 'SALES', 'JAMA', 'CLOSING'],
+                          ['TOTALS', 'ALL CUSTOMERS', reportData.totals.total_opening, reportData.totals.total_sales, reportData.totals.total_jama, reportData.totals.total_closing],
+                          [],
+                          ...(reportData.rows || []).map((r: any) => [
+                            r.sr_no,
+                            r.name,
+                            r.opening,
+                            r.sales,
+                            r.jama,
+                            r.closing
+                          ])
+                        ];
+                        exportToCSV(rows, `Sale_Report_${reportData.startDate}_to_${reportData.endDate}.csv`);
+                      }}
+                    >
+                      <FileDown size={14} /> Export Excel (CSV)
+                    </button>
+                    <button className="btn btn-secondary btn-sm" onClick={handlePrint}>
+                      <Printer size={14} /> Print Report
+                    </button>
+                  </div>
+                </div>
+
+                {/* Grand Totals Header Bar (Green Bar matching screenshot 1) */}
+                <div style={{
+                  background: '#22c55e',
+                  color: '#ffffff',
+                  borderRadius: '6px 6px 0 0',
+                  padding: '10px 16px',
+                  display: 'grid',
+                  gridTemplateColumns: '80px 2.5fr 1.2fr 1.2fr 1.2fr 1.2fr',
+                  alignItems: 'center',
+                  fontWeight: 900,
+                  fontSize: '1rem',
+                  boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+                }}>
+                  <div style={{ textTransform: 'uppercase', letterSpacing: '0.04em' }}>SALE REPORT</div>
+                  <div></div>
+                  <div style={{ textAlign: 'right', fontFamily: 'monospace' }}>{formatCurrency(reportData.totals.total_opening)}</div>
+                  <div style={{ textAlign: 'right', fontFamily: 'monospace' }}>{formatCurrency(reportData.totals.total_sales)}</div>
+                  <div style={{ textAlign: 'right', fontFamily: 'monospace' }}>{formatCurrency(reportData.totals.total_jama)}</div>
+                  <div style={{ textAlign: 'right', fontFamily: 'monospace' }}>{formatCurrency(reportData.totals.total_closing)}</div>
+                </div>
+
+                {/* Data Table */}
+                <div style={{ background: '#ffffff', border: '1.5px solid #22c55e', borderRadius: '0 0 6px 6px', overflow: 'hidden' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
+                    <thead>
+                      <tr style={{ background: '#3b82f6', color: '#ffffff', fontWeight: 900, fontSize: '0.82rem' }}>
+                        <th style={{ padding: '8px 10px', textAlign: 'center', width: '80px', borderRight: '1px solid #60a5fa' }}>SR NO</th>
+                        <th style={{ padding: '8px 12px', textAlign: 'left', borderRight: '1px solid #60a5fa' }}>NAME</th>
+                        <th style={{ padding: '8px 12px', textAlign: 'right', width: '150px', borderRight: '1px solid #60a5fa' }}>OPENING</th>
+                        <th style={{ padding: '8px 12px', textAlign: 'right', width: '150px', borderRight: '1px solid #60a5fa' }}>SALES</th>
+                        <th style={{ padding: '8px 12px', textAlign: 'right', width: '150px', borderRight: '1px solid #60a5fa' }}>JAMA</th>
+                        <th style={{ padding: '8px 12px', textAlign: 'right', width: '150px' }}>CLOSING</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(reportData.rows || []).map((row: any, idx: number) => (
+                        <tr key={idx} style={{ borderBottom: '1px solid #e2e8f0', background: idx % 2 === 0 ? '#ffffff' : '#f8fafc' }}>
+                          <td style={{ padding: '8px 10px', textAlign: 'center', fontWeight: 800, color: '#475569', borderRight: '1px solid #e2e8f0' }}>{row.sr_no}</td>
+                          <td style={{ padding: '8px 12px', fontWeight: 800, color: '#0f172a', borderRight: '1px solid #e2e8f0' }}>{row.name}</td>
+                          <td style={{ padding: '8px 12px', textAlign: 'right', fontFamily: 'monospace', fontWeight: 700, borderRight: '1px solid #e2e8f0' }}>{formatCurrency(row.opening)}</td>
+                          <td style={{ padding: '8px 12px', textAlign: 'right', fontFamily: 'monospace', fontWeight: 700, borderRight: '1px solid #e2e8f0', color: row.sales > 0 ? '#2563eb' : '#64748b' }}>{formatCurrency(row.sales)}</td>
+                          <td style={{ padding: '8px 12px', textAlign: 'right', fontFamily: 'monospace', fontWeight: 700, borderRight: '1px solid #e2e8f0', color: row.jama > 0 ? '#16a34a' : '#64748b' }}>{formatCurrency(row.jama)}</td>
+                          <td style={{ padding: '8px 12px', textAlign: 'right', fontFamily: 'monospace', fontWeight: 900, color: row.closing > 0 ? '#dc2626' : (row.closing < 0 ? '#16a34a' : '#0f172a') }}>{formatCurrency(row.closing)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {/* --- REPORT: PURCHASE HISTORY (SUPPLIER LEDGER SUMMARY) --- */}
+            {selectedReport === 'purchase_history' && reportData && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                <div className="no-print" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontSize: '0.84rem', color: '#475569', fontWeight: 700 }}>
+                    Showing Supplier Purchase & Payment History ({formatDate(reportData.startDate)} to {formatDate(reportData.endDate)})
+                  </span>
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <button
+                      className="btn btn-secondary btn-sm"
+                      onClick={() => {
+                        const rows = [
+                          ['MATUKI SWEETS - PURCHASE REPORT'],
+                          [`Period: ${formatDate(reportData.startDate)} to ${formatDate(reportData.endDate)}`],
+                          ['SR NO', 'NAME', 'TYPE', 'OPENING', 'PURCHASE', 'PAID', 'CLOSING'],
+                          ['TOTALS', 'ALL SUPPLIERS', 'DIRECT/INDIRECT', reportData.totals.total_opening, reportData.totals.total_purchase, reportData.totals.total_paid, reportData.totals.total_closing],
+                          [],
+                          ...(reportData.rows || []).map((r: any) => [
+                            r.sr_no,
+                            r.name,
+                            r.type,
+                            r.opening,
+                            r.purchase,
+                            r.paid,
+                            r.closing
+                          ])
+                        ];
+                        exportToCSV(rows, `Purchase_Report_${reportData.startDate}_to_${reportData.endDate}.csv`);
+                      }}
+                    >
+                      <FileDown size={14} /> Export Excel (CSV)
+                    </button>
+                    <button className="btn btn-secondary btn-sm" onClick={handlePrint}>
+                      <Printer size={14} /> Print Report
+                    </button>
+                  </div>
+                </div>
+
+                {/* Grand Totals Header Bar (Pink/Red Bar matching screenshot 2) */}
+                <div style={{
+                  background: '#f87171',
+                  color: '#ffffff',
+                  borderRadius: '6px 6px 0 0',
+                  padding: '10px 16px',
+                  display: 'grid',
+                  gridTemplateColumns: '70px 2fr 100px 1.2fr 1.2fr 1.2fr 1.2fr',
+                  alignItems: 'center',
+                  fontWeight: 900,
+                  fontSize: '1rem',
+                  boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+                }}>
+                  <div style={{ textTransform: 'uppercase', letterSpacing: '0.04em' }}>PURCHASE REPORT</div>
+                  <div></div>
+                  <div></div>
+                  <div style={{ textAlign: 'right', fontFamily: 'monospace' }}>{formatCurrency(reportData.totals.total_opening)}</div>
+                  <div style={{ textAlign: 'right', fontFamily: 'monospace' }}>{formatCurrency(reportData.totals.total_purchase)}</div>
+                  <div style={{ textAlign: 'right', fontFamily: 'monospace' }}>{formatCurrency(reportData.totals.total_paid)}</div>
+                  <div style={{ textAlign: 'right', fontFamily: 'monospace' }}>{formatCurrency(reportData.totals.total_closing)}</div>
+                </div>
+
+                {/* Data Table */}
+                <div style={{ background: '#ffffff', border: '1.5px solid #f87171', borderRadius: '0 0 6px 6px', overflow: 'hidden' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
+                    <thead>
+                      <tr style={{ background: '#3b82f6', color: '#ffffff', fontWeight: 900, fontSize: '0.82rem' }}>
+                        <th style={{ padding: '8px 10px', textAlign: 'center', width: '70px', borderRight: '1px solid #60a5fa' }}>SR NO</th>
+                        <th style={{ padding: '8px 12px', textAlign: 'left', borderRight: '1px solid #60a5fa' }}>NAME</th>
+                        <th style={{ padding: '8px 10px', textAlign: 'center', width: '100px', borderRight: '1px solid #60a5fa' }}>TYPE</th>
+                        <th style={{ padding: '8px 12px', textAlign: 'right', width: '140px', borderRight: '1px solid #60a5fa' }}>OPENING</th>
+                        <th style={{ padding: '8px 12px', textAlign: 'right', width: '140px', borderRight: '1px solid #60a5fa' }}>PURCHASE</th>
+                        <th style={{ padding: '8px 12px', textAlign: 'right', width: '140px', borderRight: '1px solid #60a5fa' }}>PAID</th>
+                        <th style={{ padding: '8px 12px', textAlign: 'right', width: '140px' }}>CLOSING</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(reportData.rows || []).map((row: any, idx: number) => (
+                        <tr key={idx} style={{ borderBottom: '1px solid #e2e8f0', background: idx % 2 === 0 ? '#ffffff' : '#f8fafc' }}>
+                          <td style={{ padding: '8px 10px', textAlign: 'center', fontWeight: 800, color: '#475569', borderRight: '1px solid #e2e8f0' }}>{row.sr_no}</td>
+                          <td style={{ padding: '8px 12px', fontWeight: 800, color: '#0f172a', borderRight: '1px solid #e2e8f0' }}>{row.name}</td>
+                          <td style={{ padding: '8px 10px', textAlign: 'center', fontWeight: 800, borderRight: '1px solid #e2e8f0', fontSize: '0.74rem' }}>
+                            <span style={{ background: row.type === 'DIRECT' ? '#dbeafe' : '#fef3c7', color: row.type === 'DIRECT' ? '#1e40af' : '#92400e', padding: '2px 6px', borderRadius: '4px' }}>
+                              {row.type}
+                            </span>
+                          </td>
+                          <td style={{ padding: '8px 12px', textAlign: 'right', fontFamily: 'monospace', fontWeight: 700, borderRight: '1px solid #e2e8f0' }}>{formatCurrency(row.opening)}</td>
+                          <td style={{ padding: '8px 12px', textAlign: 'right', fontFamily: 'monospace', fontWeight: 700, borderRight: '1px solid #e2e8f0', color: row.purchase > 0 ? '#dc2626' : '#64748b' }}>{formatCurrency(row.purchase)}</td>
+                          <td style={{ padding: '8px 12px', textAlign: 'right', fontFamily: 'monospace', fontWeight: 700, borderRight: '1px solid #e2e8f0', color: row.paid > 0 ? '#16a34a' : '#64748b' }}>{formatCurrency(row.paid)}</td>
+                          <td style={{ padding: '8px 12px', textAlign: 'right', fontFamily: 'monospace', fontWeight: 900, color: row.closing > 0 ? '#dc2626' : '#0f172a' }}>{formatCurrency(row.closing)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
 
             {/* --- REPORT 0: PARTY STATEMENT / KHATAVAHI STATEMENT (MAJOR NEW REPORT) --- */}
             {selectedReport === 'party_statement' && (

@@ -879,6 +879,14 @@ const server = http.createServer(async (req, res) => {
       const data = reportService.getDashboardMetrics(query.period, query.startDate, query.endDate);
       return sendJson(res, 200, { success: true, data });
     }
+    if (pathname === '/api/reports/sale-history' && method === 'GET') {
+      const data = reportService.getSaleHistoryReport(query);
+      return sendJson(res, 200, { success: true, data });
+    }
+    if (pathname === '/api/reports/purchase-history' && method === 'GET') {
+      const data = reportService.getPurchaseHistoryReport(query);
+      return sendJson(res, 200, { success: true, data });
+    }
     if (pathname === '/api/reports/google-sheet-pnl' && method === 'GET') {
       const data = reportService.getGoogleSheetPnL(query.startDate, query.endDate);
       return sendJson(res, 200, { success: true, data });

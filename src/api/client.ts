@@ -428,6 +428,14 @@ export const api = {
     if (endDate) q += `${q ? '&' : ''}endDate=${endDate}`;
     return request<any>(`/reports/google-sheet-pnl${q ? `?${q}` : ''}`);
   },
+  getSaleHistoryReport: (params: { startDate?: string; endDate?: string; search?: string } = {}) => {
+    const q = new URLSearchParams(params as any).toString();
+    return request<any>(`/reports/sale-history${q ? `?${q}` : ''}`);
+  },
+  getPurchaseHistoryReport: (params: { startDate?: string; endDate?: string; search?: string } = {}) => {
+    const q = new URLSearchParams(params as any).toString();
+    return request<any>(`/reports/purchase-history${q ? `?${q}` : ''}`);
+  },
   getSaleReport: (startDate?: string, endDate?: string) => {
     let q = '';
     if (startDate) q += `startDate=${startDate}`;

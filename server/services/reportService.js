@@ -1145,5 +1145,166 @@ export const reportService = {
         total_sales_revenue: Math.round(totalSalesRev)
       }
     };
+  },
+
+  // --- SALE HISTORY REPORT (Customer Ledger Summary Report) ---
+  getSaleHistoryReport(filters = {}) {
+    const db = getDatabase();
+    const startDate = filters.startDate || '2022-01-01';
+    const endDate = filters.endDate || new Date().toISOString().split('T')[0];
+    const search = filters.search ? `%${filters.search.trim()}%` : null;
+
+    let custQuery = 'SELECT id, name, opening_balance FROM customers WHERE active = 1';
+    const params = [];
+    if (search) {
+      custQuery += ' AND name LIKE ?';
+      params.push(search);
+    }
+    custQuery += ' ORDER BY name ASC';
+
+    const customers = db.prepare(custQuery).all(...params);
+
+    const getOpLedgerStmt = db.prepare(`
+      SELECT COALESCE(SUM(debit_amount - credit_amount), 0) as balance
+      FROM ledger_entries
+      WHERE party_type = 'CUSTOMER' AND party_id = ? AND entry_date < ?
+    `);
+
+    const getSalesStmt = db.prepare(`
+      SELECT 
+        COALESCE(SUM(CASE WHEN voucher_type = 'SALE' THEN debit_amount ELSE 0 END), 0) -
+        COALESCE(SUM(CASE WHEN voucher_type IN ('CREDIT_NOTE', 'SALES_RETURN') THEN credit_amount ELSE 0 END), 0) as sales_amount
+      FROM ledger_entries
+      WHERE party_type = 'CUSTOMER' AND party_id = ? AND entry_date BETWEEN ? AND ? AND voucher_type IN ('SALE', 'CREDIT_NOTE', 'SALES_RETURN')
+    `);
+
+    const getJamaStmt = db.prepare(`
+      SELECT COALESCE(SUM(credit_amount), 0) as jama_amount
+      FROM ledger_entries
+      WHERE party_type = 'CUSTOMER' AND party_id = ? AND entry_date BETWEEN ? AND ? AND voucher_type IN ('PAYMENT_RECEIVED', 'PAYMENT_IN')
+    `);
+
+    let totOpening = 0.0;
+    let totSales = 0.0;
+    let totJama = 0.0;
+    let totClosing = 0.0;
+
+    const rows = customers.map((c, index) => {
+      const initOp = Number(c.opening_balance) || 0.0;
+      const opLedger = getOpLedgerStmt.get(c.id, startDate).balance;
+      const opening = initOp + opLedger;
+
+      const salesAmt = getSalesStmt.get(c.id, startDate, endDate).sales_amount;
+      const jamaAmt = getJamaStmt.get(c.id, startDate, endDate).jama_amount;
+      const closing = opening + salesAmt - jamaAmt;
+
+      totOpening += opening;
+      totSales += salesAmt;
+      totJama += jamaAmt;
+      totClosing += closing;
+
+      return {
+        sr_no: index + 1,
+        id: c.id,
+        name: c.name,
+        opening: Math.round(opening * 100) / 100,
+        sales: Math.round(salesAmt * 100) / 100,
+        jama: Math.round(jamaAmt * 100) / 100,
+        closing: Math.round(closing * 100) / 100
+      };
+    });
+
+    return {
+      rows,
+      totals: {
+        total_opening: Math.round(totOpening * 100) / 100,
+        total_sales: Math.round(totSales * 100) / 100,
+        total_jama: Math.round(totJama * 100) / 100,
+        total_closing: Math.round(totClosing * 100) / 100
+      },
+      startDate,
+      endDate
+    };
+  },
+
+  // --- PURCHASE HISTORY REPORT (Supplier Ledger Summary Report) ---
+  getPurchaseHistoryReport(filters = {}) {
+    const db = getDatabase();
+    const startDate = filters.startDate || '2022-01-01';
+    const endDate = filters.endDate || new Date().toISOString().split('T')[0];
+    const search = filters.search ? `%${filters.search.trim()}%` : null;
+
+    let suppQuery = "SELECT id, name, COALESCE(expense_type, 'DIRECT') as type, opening_balance FROM suppliers WHERE active = 1";
+    const params = [];
+    if (search) {
+      suppQuery += ' AND name LIKE ?';
+      params.push(search);
+    }
+    suppQuery += ' ORDER BY name ASC';
+
+    const suppliers = db.prepare(suppQuery).all(...params);
+
+    const getOpLedgerStmt = db.prepare(`
+      SELECT COALESCE(SUM(credit_amount - debit_amount), 0) as balance
+      FROM ledger_entries
+      WHERE party_type = 'SUPPLIER' AND party_id = ? AND entry_date < ?
+    `);
+
+    const getPurchaseStmt = db.prepare(`
+      SELECT 
+        COALESCE(SUM(CASE WHEN voucher_type = 'PURCHASE' THEN credit_amount ELSE 0 END), 0) -
+        COALESCE(SUM(CASE WHEN voucher_type IN ('DEBIT_NOTE', 'PURCHASE_RETURN') THEN debit_amount ELSE 0 END), 0) as purchase_amount
+      FROM ledger_entries
+      WHERE party_type = 'SUPPLIER' AND party_id = ? AND entry_date BETWEEN ? AND ? AND voucher_type IN ('PURCHASE', 'DEBIT_NOTE', 'PURCHASE_RETURN')
+    `);
+
+    const getPaidStmt = db.prepare(`
+      SELECT COALESCE(SUM(debit_amount), 0) as paid_amount
+      FROM ledger_entries
+      WHERE party_type = 'SUPPLIER' AND party_id = ? AND entry_date BETWEEN ? AND ? AND voucher_type IN ('PAYMENT_MADE', 'PAYMENT_OUT')
+    `);
+
+    let totOpening = 0.0;
+    let totPurchase = 0.0;
+    let totPaid = 0.0;
+    let totClosing = 0.0;
+
+    const rows = suppliers.map((s, index) => {
+      const initOp = Number(s.opening_balance) || 0.0;
+      const opLedger = getOpLedgerStmt.get(s.id, startDate).balance;
+      const opening = initOp + opLedger;
+
+      const purAmt = getPurchaseStmt.get(s.id, startDate, endDate).purchase_amount;
+      const paidAmt = getPaidStmt.get(s.id, startDate, endDate).paid_amount;
+      const closing = opening + purAmt - paidAmt;
+
+      totOpening += opening;
+      totPurchase += purAmt;
+      totPaid += paidAmt;
+      totClosing += closing;
+
+      return {
+        sr_no: index + 1,
+        id: s.id,
+        name: s.name,
+        type: s.type || 'DIRECT',
+        opening: Math.round(opening * 100) / 100,
+        purchase: Math.round(purAmt * 100) / 100,
+        paid: Math.round(paidAmt * 100) / 100,
+        closing: Math.round(closing * 100) / 100
+      };
+    });
+
+    return {
+      rows,
+      totals: {
+        total_opening: Math.round(totOpening * 100) / 100,
+        total_purchase: Math.round(totPurchase * 100) / 100,
+        total_paid: Math.round(totPaid * 100) / 100,
+        total_closing: Math.round(totClosing * 100) / 100
+      },
+      startDate,
+      endDate
+    };
   }
 };
