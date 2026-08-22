@@ -60,7 +60,7 @@ server {
     index index.html;
 
     location /api/ {
-        proxy_pass http://127.0.0.1:4321/api/;
+        proxy_pass http://127.0.0.1:4321;
         proxy_http_version 1.1;
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection 'upgrade';
