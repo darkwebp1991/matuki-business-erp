@@ -475,6 +475,31 @@ export const partyService = {
         );
       }
 
+      // Auto-sync supplier to customers table so party appears in Customer Ledger & everywhere in ERP
+      try {
+        const existingCust = db.prepare('SELECT id FROM customers WHERE LOWER(TRIM(name)) = LOWER(?)').get(trimmedName);
+        if (!existingCust) {
+          const custNo = `CUST-S${String(newId).padStart(3, '0')}`;
+          db.prepare(`
+            INSERT INTO customers (
+              customer_no, name, mobile, email, address, city, gstin,
+              opening_balance, advance_balance, credit_limit, notes, active
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0.0, 50000.0, 'Caterer / Supplier Account', 1)
+          `).run(
+            custNo,
+            trimmedName,
+            trimmedMobile,
+            (data.email || '').trim(),
+            (data.address || '').trim(),
+            (data.city || 'Surat').trim(),
+            (data.gstin || '').trim(),
+            Number(data.opening_balance) || 0.0
+          );
+        }
+      } catch (err) {
+        console.error('Supplier to customer auto-sync warning:', err);
+      }
+
       db.prepare(`
         INSERT INTO audit_logs (username, action, module, record_id, notes)
         VALUES (?, 'CREATE', 'SUPPLIERS', ?, ?)
