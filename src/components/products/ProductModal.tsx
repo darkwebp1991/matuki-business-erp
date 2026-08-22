@@ -8,13 +8,15 @@ import { getGujaratiName } from '../../utils/gujaratiTranslation';
 interface ProductModalProps {
   isOpen: boolean;
   product: Product | null;
+  initialName?: string;
   onClose: () => void;
-  onSuccess: () => void;
+  onSuccess: (product?: Product) => void;
 }
 
 export const ProductModal: React.FC<ProductModalProps> = ({
   isOpen,
   product,
+  initialName = '',
   onClose,
   onSuccess
 }) => {
@@ -152,7 +154,7 @@ export const ProductModal: React.FC<ProductModalProps> = ({
       setFormData({
         code: '',
         barcode: '',
-        name: '',
+        name: initialName || '',
         category_id: '',
         product_type: 'FINISHED_PRODUCT',
         unit: 'KILOGRAMS (KG)',
@@ -169,7 +171,7 @@ export const ProductModal: React.FC<ProductModalProps> = ({
         active: true
       });
     }
-  }, [product, isOpen]);
+  }, [product, initialName, isOpen]);
 
   const handleRawChange = (index: number, field: string, value: any) => {
     const updated = [...rawMaterials];
@@ -268,7 +270,7 @@ export const ProductModal: React.FC<ProductModalProps> = ({
         }
       }
 
-      onSuccess();
+      onSuccess(targetProduct);
     } catch (err: any) {
       setError(err.message || 'Failed to save item');
     } finally {

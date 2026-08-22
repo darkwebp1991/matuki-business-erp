@@ -26,6 +26,7 @@ import { Product, Customer, Driver, DeliveryLocation, AreaDeliveryRate, AdvanceO
 import { formatCurrency, formatDate } from '../../utils/formatters';
 import { ChefProductionPrintModal } from './ChefProductionPrintModal';
 import { AddNewVenueModal } from '../common/AddNewVenueModal';
+import { ProductModal } from '../products/ProductModal';
 
 interface AdvanceOrderModalProps {
   isOpen: boolean;
@@ -106,6 +107,11 @@ export const AdvanceOrderModal: React.FC<AdvanceOrderModalProps> = ({
   const [deliveryAddress, setDeliveryAddress] = useState<string>('');
   const [isAddNewVenueOpen, setIsAddNewVenueOpen] = useState<boolean>(false);
   const venueSearchRef = useRef<HTMLDivElement>(null);
+
+  // Add New Product / Sweet Modal State
+  const [isAddProductModalOpen, setIsAddProductModalOpen] = useState<boolean>(false);
+  const [addProductInitialName, setAddProductInitialName] = useState<string>('');
+  const [targetRowIdxForNewProduct, setTargetRowIdxForNewProduct] = useState<number | null>(null);
 
   // AI Smart Recommendation State
   const [frequentVenues, setFrequentVenues] = useState<Array<{ venue_name: string; usage_count: number; address?: string; area_landmark?: string; customer_charge?: number; driver_rent?: number }>>([]);
@@ -1438,6 +1444,32 @@ export const AdvanceOrderModal: React.FC<AdvanceOrderModalProps> = ({
                             zIndex: 9999,
                             marginTop: '2px'
                           }}>
+                            {/* ➕ Add New Product Option at top */}
+                            <div
+                              onClick={() => {
+                                setAddProductInitialName(row.product_name || itemSearchText || '');
+                                setTargetRowIdxForNewProduct(idx);
+                                setActiveItemDropdownIdx(null);
+                                setIsAddProductModalOpen(true);
+                              }}
+                              style={{
+                                padding: '8px 10px',
+                                cursor: 'pointer',
+                                background: '#eff6ff',
+                                borderBottom: '1.5px solid #bfdbfe',
+                                fontSize: '0.78rem',
+                                fontWeight: 800,
+                                color: '#1d4ed8',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '6px'
+                              }}
+                              onMouseEnter={(e) => (e.currentTarget.style.background = '#dbeafe')}
+                              onMouseLeave={(e) => (e.currentTarget.style.background = '#eff6ff')}
+                            >
+                              <Plus size={14} color="#1d4ed8" /> 
+                              <span>➕ Add &quot;<strong>{row.product_name || itemSearchText || 'New Item'}</strong>&quot; to Products Master List</span>
+                            </div>
                             <div style={{
                               display: 'grid',
                               gridTemplateColumns: '2fr 1fr 1fr',
@@ -2061,6 +2093,26 @@ export const AdvanceOrderModal: React.FC<AdvanceOrderModalProps> = ({
           isOpen={isChefPrintSuccessOpen}
           summary={chefDailySummary}
           onClose={() => setIsChefPrintSuccessOpen(false)}
+        />
+      )}
+
+      {/* Add New Product Modal */}
+      {isAddProductModalOpen && (
+        <ProductModal
+          isOpen={isAddProductModalOpen}
+          product={null}
+          initialName={addProductInitialName}
+          onClose={() => setIsAddProductModalOpen(false)}
+          onSuccess={(newProd) => {
+            setIsAddProductModalOpen(false);
+            api.getProducts({ active: true }).then(freshProds => {
+              setProducts(freshProds || []);
+              const prod = (newProd && newProd.id) ? (freshProds.find(p => p.id === newProd.id) || newProd) : newProd;
+              if (prod && targetRowIdxForNewProduct !== null) {
+                handleSelectProduct(targetRowIdxForNewProduct, prod);
+              }
+            }).catch(console.error);
+          }}
         />
       )}
 

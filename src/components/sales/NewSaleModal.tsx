@@ -27,6 +27,7 @@ import { api } from '../../api/client';
 import { Product, Customer, Driver, DeliveryLocation, AreaDeliveryRate, AdvanceOrder, Sale, VasanMasterItem } from '../../types';
 import { formatCurrency, formatDate } from '../../utils/formatters';
 import { CustomerModal } from '../parties/CustomerModal';
+import { ProductModal } from '../products/ProductModal';
 import { VoiceSearchButton } from '../common/VoiceSearchButton';
 import { AddNewVenueModal } from '../common/AddNewVenueModal';
 
@@ -78,6 +79,11 @@ export const NewSaleModal: React.FC<NewSaleModalProps> = ({
   const [isCustomerDropdownOpen, setIsCustomerDropdownOpen] = useState<boolean>(false);
   const [selectedCustomerHighlightIdx, setSelectedCustomerHighlightIdx] = useState<number>(0);
   const [isAddCustomerModalOpen, setIsAddCustomerModalOpen] = useState<boolean>(false);
+
+  // Add New Product / Sweet Modal State
+  const [isAddProductModalOpen, setIsAddProductModalOpen] = useState<boolean>(false);
+  const [addProductInitialName, setAddProductInitialName] = useState<string>('');
+  const [targetRowIdxForNewProduct, setTargetRowIdxForNewProduct] = useState<number | null>(null);
   const customerInputRef = useRef<HTMLInputElement>(null);
   const customerDropdownRef = useRef<HTMLDivElement>(null);
 
@@ -1790,6 +1796,32 @@ export const NewSaleModal: React.FC<NewSaleModalProps> = ({
                         zIndex: 99999,
                         marginTop: '2px'
                       }}>
+                        {/* ➕ Add New Product Option at top */}
+                        <div
+                          onClick={() => {
+                            setAddProductInitialName(row.product_name || itemSearchText || '');
+                            setTargetRowIdxForNewProduct(idx);
+                            setActiveItemDropdownIdx(null);
+                            setIsAddProductModalOpen(true);
+                          }}
+                          style={{
+                            padding: '8px 10px',
+                            cursor: 'pointer',
+                            background: '#eff6ff',
+                            borderBottom: '1.5px solid #bfdbfe',
+                            fontSize: '0.78rem',
+                            fontWeight: 800,
+                            color: '#1d4ed8',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '6px'
+                          }}
+                          onMouseEnter={(e) => (e.currentTarget.style.background = '#dbeafe')}
+                          onMouseLeave={(e) => (e.currentTarget.style.background = '#eff6ff')}
+                        >
+                          <Plus size={14} color="#1d4ed8" /> 
+                          <span>➕ Add &quot;<strong>{row.product_name || itemSearchText || 'New Item'}</strong>&quot; to Products Master List</span>
+                        </div>
                         <div style={{
                           display: 'grid',
                           gridTemplateColumns: '2fr 1fr 1fr',
@@ -2305,6 +2337,26 @@ export const NewSaleModal: React.FC<NewSaleModalProps> = ({
             </div>
           </div>
         </div>
+      )}
+
+      {/* Add New Product Modal */}
+      {isAddProductModalOpen && (
+        <ProductModal
+          isOpen={isAddProductModalOpen}
+          product={null}
+          initialName={addProductInitialName}
+          onClose={() => setIsAddProductModalOpen(false)}
+          onSuccess={(newProd) => {
+            setIsAddProductModalOpen(false);
+            api.getProducts({ active: true }).then(freshProds => {
+              setProducts(freshProds || []);
+              const prod = (newProd && newProd.id) ? (freshProds.find(p => p.id === newProd.id) || newProd) : newProd;
+              if (prod && targetRowIdxForNewProduct !== null) {
+                handleSelectProduct(targetRowIdxForNewProduct, prod);
+              }
+            }).catch(console.error);
+          }}
+        />
       )}
 
       {/* Add New Venue Modal */}
