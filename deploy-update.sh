@@ -35,6 +35,7 @@ if os.path.exists(db_path):
 
 # 3. Pull latest code updates from GitHub
 echo "📥 Pulling latest code changes..."
+git checkout -- wa_session/creds.json > /dev/null 2>&1 || true
 git pull origin main || git pull
 
 # 4. Install any new npm packages
