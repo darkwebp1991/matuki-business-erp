@@ -207,7 +207,9 @@ export const TodoView: React.FC<TodoViewProps> = ({ currentUser, settings }) => 
     const payload = {
       title: titleText,
       description: '',
-      assigned_to_name: quickAssignee,
+      assigned_to_name: activeUsername,
+      assigned_by_name: activeUsername,
+      assignment_status: 'ACCEPTED',
       due_date: finalDueDate,
       due_time: finalDueTime,
       priority: finalPriority,

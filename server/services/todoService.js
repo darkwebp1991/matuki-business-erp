@@ -177,16 +177,9 @@ export const todoService = {
     const assignedToName = (data.assigned_to_name || username || 'Admin').trim();
 
     // Assignment status logic:
-    // If assigned to another user -> PENDING_ASSIGNMENT (Requires Accept/Reject)
-    // If assigned to self -> ACCEPTED
-    let assignmentStatus = data.assignment_status;
-    if (!assignmentStatus) {
-      if (assignedToName.toLowerCase() !== assignedByName.toLowerCase()) {
-        assignmentStatus = 'PENDING_ASSIGNMENT';
-      } else {
-        assignmentStatus = 'ACCEPTED';
-      }
-    }
+    // By default, ALL created tasks go directly to 'ACCEPTED' status (My To-Do List)
+    // Only set 'PENDING_ASSIGNMENT' if explicitly requested when reassigning to another team member
+    let assignmentStatus = data.assignment_status || 'ACCEPTED';
 
     const dueDate = data.due_date || new Date().toISOString().split('T')[0];
     const dueTime = (data.due_time || '').trim() || extractTimeFromText(title) || extractTimeFromText(description);
