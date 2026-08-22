@@ -69,6 +69,19 @@ export const AdvanceOrderModal: React.FC<AdvanceOrderModalProps> = ({
   const [saving, setSaving] = useState<boolean>(false);
   const [error, setError] = useState<string>('');
 
+  // Unified Party Search State (Customers + Suppliers / Caterers)
+  const [allParties, setAllParties] = useState<Array<{
+    id: number;
+    name: string;
+    mobile?: string;
+    address?: string;
+    party_type: 'CUSTOMER' | 'SUPPLIER';
+    current_balance?: number;
+  }>>([]);
+  const [partySearchQuery, setPartySearchQuery] = useState<string>('');
+  const [isPartyDropdownOpen, setIsPartyDropdownOpen] = useState<boolean>(false);
+  const partySearchRef = useRef<HTMLDivElement>(null);
+
   // Success Confirmation Modal State
   const [savedOrderSuccess, setSavedOrderSuccess] = useState<AdvanceOrder | null>(null);
   const [isChefPrintSuccessOpen, setIsChefPrintSuccessOpen] = useState<boolean>(false);
@@ -139,9 +152,10 @@ export const AdvanceOrderModal: React.FC<AdvanceOrderModalProps> = ({
     const loadMasters = async () => {
       try {
         setLoading(true);
-        const [prodRes, custRes, drvRes, locRes, areaRes] = await Promise.all([
+        const [prodRes, custRes, suppRes, drvRes, locRes, areaRes] = await Promise.all([
           api.getProducts(),
           api.getCustomers(),
+          api.getSuppliers(),
           api.getDrivers(),
           api.getDeliveryLocations(),
           api.getAreaDeliveryRates()
@@ -151,6 +165,27 @@ export const AdvanceOrderModal: React.FC<AdvanceOrderModalProps> = ({
         setDrivers(drvRes || []);
         setLocations(locRes || []);
         setAreaRates(areaRes || []);
+
+        // Build Unified Parties list (Customers + Caterers + Suppliers)
+        const unified = [
+          ...(custRes || []).map((c: any) => ({
+            id: c.id,
+            name: c.name,
+            mobile: c.mobile,
+            address: c.address,
+            party_type: 'CUSTOMER' as const,
+            current_balance: c.current_balance || c.closing_balance || 0
+          })),
+          ...(suppRes || []).map((s: any) => ({
+            id: s.id,
+            name: s.name,
+            mobile: s.mobile,
+            address: s.address,
+            party_type: 'SUPPLIER' as const,
+            current_balance: s.current_balance || s.closing_balance || 0
+          }))
+        ];
+        setAllParties(unified);
       } catch (err) {
         console.error('Failed to load masters:', err);
       } finally {
@@ -677,28 +712,168 @@ export const AdvanceOrderModal: React.FC<AdvanceOrderModalProps> = ({
         }}>
           {/* Left Column: Customer and Delivery Inputs */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-            {/* Row 1: Customer Search, Party Name, Phone */}
+            {/* Row 1: Searchable Party Box, Party Name, Phone */}
             <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr 1fr', gap: '10px' }}>
-              <div>
+              <div ref={partySearchRef} style={{ position: 'relative' }}>
                 <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: 800, color: '#334155', marginBottom: '3px' }}>
-                  Select Caterer / Party *
+                  🔍 Search Caterer / Party Name / Mobile *
                 </label>
-                <select
-                  className="form-select"
-                  style={{ width: '100%', fontSize: '0.84rem', padding: '6px 8px', fontWeight: 700, borderColor: '#cbd5e1' }}
-                  value={customerId}
-                  onChange={(e) => handleCustomerChange(e.target.value)}
-                >
-                  <option value="">-- Type Custom Caterer Name --</option>
-                  {customers.map(c => (
-                    <option key={c.id} value={c.id}>
-                      {c.name} {c.mobile ? `(${c.mobile})` : ''} {c.current_balance ? `[Bal: ₹${c.current_balance}]` : ''}
-                    </option>
-                  ))}
-                </select>
+                <div style={{ position: 'relative' }}>
+                  <input
+                    type="text"
+                    className="form-input"
+                    style={{
+                      width: '100%',
+                      fontSize: '0.84rem',
+                      padding: '6px 28px 6px 8px',
+                      fontWeight: 700,
+                      borderColor: isPartyDropdownOpen ? '#3b82f6' : '#cbd5e1',
+                      background: '#ffffff'
+                    }}
+                    placeholder="Type name (Arvind, Paresh...) or mobile..."
+                    value={partySearchQuery}
+                    onFocus={() => setIsPartyDropdownOpen(true)}
+                    onChange={(e) => {
+                      const q = e.target.value;
+                      setPartySearchQuery(q);
+                      setCustomerName(q);
+                      setIsPartyDropdownOpen(true);
+                    }}
+                  />
+                  {partySearchQuery ? (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setPartySearchQuery('');
+                        setCustomerId('');
+                        setCustomerName('');
+                        setCustomerMobile('');
+                        setCustomerBalance(0);
+                        setIsPartyDropdownOpen(false);
+                      }}
+                      style={{
+                        position: 'absolute',
+                        right: '6px',
+                        top: '50%',
+                        transform: 'translateY(-50%)',
+                        background: 'none',
+                        border: 'none',
+                        color: '#94a3b8',
+                        cursor: 'pointer',
+                        fontSize: '0.85rem',
+                        fontWeight: 900
+                      }}
+                    >
+                      ✕
+                    </button>
+                  ) : (
+                    <ChevronDown
+                      size={14}
+                      color="#64748b"
+                      style={{
+                        position: 'absolute',
+                        right: '8px',
+                        top: '50%',
+                        transform: 'translateY(-50%)',
+                        pointerEvents: 'none'
+                      }}
+                    />
+                  )}
+                </div>
+
+                {/* Dropdown Results list */}
+                {isPartyDropdownOpen && (
+                  <div style={{
+                    position: 'absolute',
+                    top: '100%',
+                    left: 0,
+                    right: 0,
+                    maxHeight: '260px',
+                    overflowY: 'auto',
+                    background: '#ffffff',
+                    border: '1.5px solid #3b82f6',
+                    borderRadius: '8px',
+                    boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.15)',
+                    zIndex: 10000,
+                    marginTop: '2px'
+                  }}>
+                    {(() => {
+                      const filtered = allParties.filter(p => {
+                        if (!partySearchQuery.trim()) return true;
+                        const q = partySearchQuery.toLowerCase().trim();
+                        return (
+                          p.name.toLowerCase().includes(q) ||
+                          (p.mobile && p.mobile.includes(q))
+                        );
+                      });
+
+                      if (filtered.length === 0) {
+                        return (
+                          <div style={{ padding: '10px 12px', fontSize: '0.8rem', color: '#64748b' }}>
+                            No party found matching &quot;{partySearchQuery}&quot;. You can type a new custom party name directly!
+                          </div>
+                        );
+                      }
+
+                      return filtered.map(p => (
+                        <div
+                          key={`${p.party_type}_${p.id}`}
+                          onClick={() => {
+                            setCustomerId(String(p.id));
+                            setCustomerName(p.name);
+                            setCustomerMobile(p.mobile || '');
+                            setCustomerBalance(p.current_balance || 0);
+                            setPartySearchQuery(p.name);
+                            if (p.address && !deliveryAddress) {
+                              setDeliveryAddress(p.address);
+                            }
+                            setIsPartyDropdownOpen(false);
+                          }}
+                          style={{
+                            padding: '8px 12px',
+                            borderBottom: '1px solid #f1f5f9',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                            background: customerId === String(p.id) ? '#eff6ff' : '#ffffff'
+                          }}
+                          onMouseEnter={(e) => (e.currentTarget.style.background = '#f8fafc')}
+                          onMouseLeave={(e) => (e.currentTarget.style.background = customerId === String(p.id) ? '#eff6ff' : '#ffffff')}
+                        >
+                          <div>
+                            <div style={{ fontSize: '0.84rem', fontWeight: 800, color: '#0f172a' }}>
+                              {p.name}
+                            </div>
+                            <div style={{ fontSize: '0.72rem', color: '#64748b', display: 'flex', gap: '8px', alignItems: 'center' }}>
+                              {p.mobile && <span>📞 {p.mobile}</span>}
+                              <span style={{
+                                padding: '1px 5px',
+                                borderRadius: '4px',
+                                fontSize: '0.65rem',
+                                fontWeight: 800,
+                                background: p.party_type === 'CUSTOMER' ? '#dcfce7' : '#fef3c7',
+                                color: p.party_type === 'CUSTOMER' ? '#15803d' : '#b45309'
+                              }}>
+                                {p.party_type === 'CUSTOMER' ? '👤 Customer' : '🏢 Caterer / Supplier'}
+                              </span>
+                            </div>
+                          </div>
+
+                          {p.current_balance ? (
+                            <span style={{ fontSize: '0.72rem', fontWeight: 800, color: p.current_balance > 0 ? '#dc2626' : '#16a34a' }}>
+                              ₹{Math.abs(p.current_balance).toLocaleString('en-IN')}
+                            </span>
+                          ) : null}
+                        </div>
+                      ));
+                    })()}
+                  </div>
+                )}
+
                 {customerBalance > 0 && (
-                  <div style={{ fontSize: '0.7rem', color: '#16a34a', fontWeight: 700, marginTop: '2px' }}>
-                    Prev Ledger Balance: {formatCurrency(customerBalance)}
+                  <div style={{ fontSize: '0.7rem', color: '#dc2626', fontWeight: 800, marginTop: '3px' }}>
+                    ⚠️ Prev Ledger Due: {formatCurrency(customerBalance)}
                   </div>
                 )}
               </div>

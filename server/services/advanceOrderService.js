@@ -8,12 +8,13 @@ export const advanceOrderService = {
     let query = `
       SELECT 
         o.*,
-        c.name as customer_name_actual,
-        c.mobile as customer_mobile_actual,
-        c.address as customer_address,
+        COALESCE(c.name, s.name, o.customer_name) as customer_name_actual,
+        COALESCE(c.mobile, s.mobile, o.customer_mobile) as customer_mobile_actual,
+        COALESCE(c.address, s.address) as customer_address,
         (SELECT COUNT(*) FROM advance_order_items WHERE order_id = o.id) as item_count
       FROM advance_orders o
       LEFT JOIN customers c ON o.customer_id = c.id
+      LEFT JOIN suppliers s ON o.customer_id = s.id
       WHERE 1=1
     `;
     const params = [];
@@ -43,14 +44,24 @@ export const advanceOrderService = {
     }
 
     if (customerId) {
-      query += ' AND o.customer_id = ?';
-      params.push(Number(customerId));
+      query += ' AND (o.customer_id = ? OR LOWER(o.customer_name) LIKE ?)';
+      params.push(Number(customerId), `%${customerId}%`);
     }
 
     if (search && search.trim()) {
       const s = `%${search.trim()}%`;
-      query += ' AND (o.order_no LIKE ? OR o.customer_name LIKE ? OR o.delivery_venue LIKE ? OR o.notes LIKE ?)';
-      params.push(s, s, s, s);
+      query += ` AND (
+        o.order_no LIKE ? OR 
+        o.customer_name LIKE ? OR 
+        c.name LIKE ? OR 
+        s.name LIKE ? OR 
+        o.customer_mobile LIKE ? OR 
+        c.mobile LIKE ? OR 
+        s.mobile LIKE ? OR 
+        o.delivery_venue LIKE ? OR 
+        o.notes LIKE ?
+      )`;
+      params.push(s, s, s, s, s, s, s, s, s);
     }
 
     query += " ORDER BY o.delivery_date ASC, CASE o.delivery_slot WHEN 'MORNING' THEN 1 WHEN 'EVENING' THEN 2 ELSE 3 END, o.id ASC";
