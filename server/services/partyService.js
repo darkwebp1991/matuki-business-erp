@@ -27,8 +27,16 @@ export const partyService = {
 
     // 3. Auto-create customer in customers master table!
     try {
-      const custNo = settingsService.getNextDocumentNumber('CUSTOMER');
-      const trimmedMobile = (mobile || '').trim();
+      const trimmedMobile = (finalMobile || '').trim();
+
+      const maxRow = db.prepare("SELECT MAX(id) as max_id FROM customers").get();
+      const nextId = (maxRow?.max_id || 800) + 1;
+      let custNo = `CUST-${nextId}`;
+
+      const dupCheck = db.prepare("SELECT id FROM customers WHERE customer_no = ?").get(custNo);
+      if (dupCheck) {
+        custNo = `CUST-${nextId}-${Math.floor(Math.random() * 1000)}`;
+      }
 
       const insertStmt = db.prepare(`
         INSERT INTO customers (customer_no, name, mobile, address, opening_balance, active)
