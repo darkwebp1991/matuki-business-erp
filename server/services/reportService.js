@@ -1262,8 +1262,10 @@ export const reportService = {
 
       const initOp = Number(c.opening_balance) || 0;
       const opening = initOp + (sData.sales_before - pData.pay_before + lData.ledger_before);
-      const salesAmt = sData.sales_period + lData.ledger_debit_period;
-      const jamaAmt = pData.pay_period + lData.ledger_credit_period;
+      // Net Sales = Gross Sales - Sale Returns (ledger_credit_period) + Debit Charges (ledger_debit_period)
+      const salesAmt = sData.sales_period - lData.ledger_credit_period + lData.ledger_debit_period;
+      // Jama = Direct Payment-In collected from Customer
+      const jamaAmt = pData.pay_period;
       const closing = opening + salesAmt - jamaAmt;
 
       // Include all parties that have non-zero balance or activity
@@ -1402,8 +1404,10 @@ export const reportService = {
 
       const initOp = Number(s.opening_balance) || 0;
       const opening = initOp + (pData.pur_before - payData.pay_before + lData.ledger_before);
-      const purAmt = pData.pur_period + lData.ledger_credit_period;
-      const paidAmt = payData.pay_period + lData.ledger_debit_period;
+      // Net Purchase = Gross Purchase - Purchase Returns (ledger_debit_period) + Credit Charges (ledger_credit_period)
+      const purAmt = pData.pur_period - lData.ledger_debit_period + lData.ledger_credit_period;
+      // Paid = Direct Payment-Out paid to Supplier
+      const paidAmt = payData.pay_period;
       const closing = opening + purAmt - paidAmt;
 
       if (opening !== 0 || purAmt !== 0 || paidAmt !== 0 || closing !== 0) {
