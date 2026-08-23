@@ -1,21 +1,40 @@
-// Export any array of objects to CSV download
+// Export any array of objects or array of arrays to CSV download
 export function exportToCSV(data: any[], filename = 'export.csv') {
   if (!data || !data.length) return;
 
-  const headers = Object.keys(data[0]);
-  const rows = data.map(obj => (
-    headers.map(header => {
-      let val = obj[header];
-      if (val === null || val === undefined) val = '';
-      if (typeof val === 'string') {
-        // Escape quotes
-        val = `"${val.replace(/"/g, '""')}"`;
-      }
-      return val;
-    }).join(',')
-  ));
+  let csvRows: string[] = [];
 
-  const csvContent = 'data:text/csv;charset=utf-8,\uFEFF' + [headers.join(','), ...rows].join('\n');
+  // Check if data is an array of arrays (string[][]) or array of objects
+  if (Array.isArray(data[0])) {
+    csvRows = data.map((row: any[]) =>
+      row.map(val => {
+        if (val === null || val === undefined) val = '';
+        const strVal = String(val);
+        // Escape quotes if needed or contains commas / newlines
+        if (strVal.includes('"') || strVal.includes(',') || strVal.includes('\n')) {
+          return `"${strVal.replace(/"/g, '""')}"`;
+        }
+        return strVal;
+      }).join(',')
+    );
+  } else {
+    const headers = Object.keys(data[0]);
+    const headerRow = headers.join(',');
+    const contentRows = data.map(obj =>
+      headers.map(header => {
+        let val = obj[header];
+        if (val === null || val === undefined) val = '';
+        const strVal = String(val);
+        if (strVal.includes('"') || strVal.includes(',') || strVal.includes('\n')) {
+          return `"${strVal.replace(/"/g, '""')}"`;
+        }
+        return strVal;
+      }).join(',')
+    );
+    csvRows = [headerRow, ...contentRows];
+  }
+
+  const csvContent = 'data:text/csv;charset=utf-8,\uFEFF' + csvRows.join('\n');
   const encodedUri = encodeURI(csvContent);
   const link = document.createElement('a');
   link.setAttribute('href', encodedUri);

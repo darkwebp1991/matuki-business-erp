@@ -1643,11 +1643,43 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ settings: propSettings
             {/* 1. SALE REPORT */}
             {selectedReport === 'sale' && reportData && (
               <div className="table-container invoice-printable">
-                <div style={{ padding: '12px 16px', background: '#f8fafc', borderBottom: '1px solid #e2e8f0', display: 'flex', gap: '20px', fontSize: '0.84rem' }}>
-                  <span>Total Sales: <strong style={{ color: '#0f172a' }}>{formatCurrency(reportData.total_sales)}</strong></span>
-                  <span>Received: <strong style={{ color: '#15803d' }}>{formatCurrency(reportData.total_paid)}</strong></span>
-                  <span>Balance Due: <strong style={{ color: '#dc2626' }}>{formatCurrency(reportData.total_due)}</strong></span>
-                  <span>Gross Profit: <strong style={{ color: '#15803d' }}>{formatCurrency(reportData.total_profit)}</strong></span>
+                <div style={{ padding: '12px 16px', background: '#f8fafc', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '20px', fontSize: '0.84rem' }}>
+                  <div style={{ display: 'flex', gap: '20px', alignItems: 'center' }}>
+                    <span>Total Sales: <strong style={{ color: '#0f172a' }}>{formatCurrency(reportData.total_sales)}</strong></span>
+                    <span>Received: <strong style={{ color: '#15803d' }}>{formatCurrency(reportData.total_paid)}</strong></span>
+                    <span>Balance Due: <strong style={{ color: '#dc2626' }}>{formatCurrency(reportData.total_due)}</strong></span>
+                    <span>Gross Profit: <strong style={{ color: '#15803d' }}>{formatCurrency(reportData.total_profit)}</strong></span>
+                  </div>
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <button
+                      className="btn btn-secondary btn-sm"
+                      onClick={() => {
+                        const rows = [
+                          ['MATUKI SWEETS - SALES INVOICES REPORT'],
+                          [`Period: ${formatDate(startDate)} to ${formatDate(endDate)}`],
+                          ['DATE', 'BILL #', 'PARTY NAME', 'DELIVERY VENUE', 'PAYMENT TYPE', 'TOTAL AMOUNT', 'RECEIVED', 'BALANCE DUE'],
+                          ['TOTALS', 'ALL INVOICES', 'SUMMARY', '', '', reportData.total_sales, reportData.total_paid, reportData.total_due],
+                          [],
+                          ...(reportData.sales || []).map((s: any) => [
+                            formatDate(s.date),
+                            s.invoice_no,
+                            s.customer_name,
+                            s.delivery_venue || '',
+                            s.payment_mode,
+                            s.grand_total,
+                            s.paid_amount,
+                            s.due_amount
+                          ])
+                        ];
+                        exportToCSV(rows, `Sales_Invoices_Report_${startDate}_to_${endDate}.csv`);
+                      }}
+                    >
+                      <FileDown size={14} /> Export Excel (CSV)
+                    </button>
+                    <button className="btn btn-secondary btn-sm" onClick={handlePrint}>
+                      <Printer size={14} /> Print Report
+                    </button>
+                  </div>
                 </div>
                 <table className="data-table">
                   <thead>
