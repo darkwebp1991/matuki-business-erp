@@ -70,15 +70,26 @@ export const reportService = {
     `).get(startDate, endDate);
 
     const receivables = db.prepare(`
-      SELECT COALESCE(SUM(c.opening_balance), 0) as total_receivable
-      FROM customers c
-      WHERE c.active = 1 AND c.opening_balance > 0
+      SELECT COALESCE(SUM(c_bal), 0) as total_receivable FROM (
+        SELECT (COALESCE(c.opening_balance, 0)
+          + COALESCE((SELECT SUM(grand_total) FROM sales WHERE (customer_id = c.id OR customer_name = c.name) AND status != 'CANCELLED'), 0)
+          - COALESCE((SELECT SUM(amount) FROM payments WHERE party_type = 'CUSTOMER' AND (party_id = c.id OR party_name = c.name)), 0)
+          - COALESCE((SELECT SUM(total_amount) FROM sales_returns WHERE customer_id = c.id AND status != 'CANCELLED'), 0)
+          + COALESCE((SELECT SUM(debit_amount - credit_amount) FROM ledger_entries WHERE party_type = 'CUSTOMER' AND (party_id = c.id OR party_name = c.name) AND voucher_type NOT IN ('SALE', 'PAYMENT_IN', 'CREDIT_NOTE', 'OPENING_BALANCE')), 0)
+        ) as c_bal
+        FROM customers c WHERE c.active = 1
+      ) WHERE c_bal > 0
     `).get();
 
     const payables = db.prepare(`
-      SELECT COALESCE(SUM(s.opening_balance), 0) as total_payable
-      FROM suppliers s
-      WHERE s.active = 1 AND s.opening_balance > 0
+      SELECT COALESCE(SUM(s_bal), 0) as total_payable FROM (
+        SELECT (COALESCE(s.opening_balance, 0)
+          + COALESCE((SELECT SUM(grand_total) FROM purchases WHERE (supplier_id = s.id OR supplier_name = s.name) AND status != 'CANCELLED'), 0)
+          - COALESCE((SELECT SUM(amount) FROM payments WHERE party_type = 'SUPPLIER' AND (party_id = s.id OR party_name = s.name)), 0)
+          + COALESCE((SELECT SUM(credit_amount - debit_amount) FROM ledger_entries WHERE party_type = 'SUPPLIER' AND (party_id = s.id OR party_name = s.name) AND voucher_type NOT IN ('PURCHASE', 'PAYMENT_OUT', 'OPENING_BALANCE')), 0)
+        ) as s_bal
+        FROM suppliers s WHERE s.active = 1
+      ) WHERE s_bal > 0
     `).get();
 
     const cashBalance = db.prepare(`

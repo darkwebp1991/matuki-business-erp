@@ -101,13 +101,18 @@ export const partyService = {
     const db = getDatabase();
     let query = `
       SELECT c.*,
-        COALESCE(c.opening_balance, 0) as current_balance,
-        (SELECT COUNT(*) FROM sales WHERE customer_id = c.id AND status != 'CANCELLED') as total_invoices,
-        (SELECT COALESCE(SUM(grand_total), 0) FROM sales WHERE customer_id = c.id AND status != 'CANCELLED') as total_sales_amount,
-        (SELECT MAX(payment_date) FROM payments WHERE party_type = 'CUSTOMER' AND party_id = c.id) as last_payment_date,
-        (SELECT MAX(date) FROM sales WHERE customer_id = c.id AND status != 'CANCELLED') as last_sale_date,
-        (SELECT MIN(date) FROM sales WHERE customer_id = c.id AND due_amount > 0 AND status != 'CANCELLED') as oldest_unpaid_sale_date,
-        (SELECT COALESCE(SUM(due_amount), 0) FROM sales WHERE customer_id = c.id AND due_amount > 0 AND status != 'CANCELLED' AND date <= date('now', '-30 days')) as unpaid_30d_amount
+        (COALESCE(c.opening_balance, 0)
+          + COALESCE((SELECT SUM(grand_total) FROM sales WHERE (customer_id = c.id OR customer_name = c.name) AND status != 'CANCELLED'), 0)
+          - COALESCE((SELECT SUM(amount) FROM payments WHERE party_type = 'CUSTOMER' AND (party_id = c.id OR party_name = c.name)), 0)
+          - COALESCE((SELECT SUM(total_amount) FROM sales_returns WHERE customer_id = c.id AND status != 'CANCELLED'), 0)
+          + COALESCE((SELECT SUM(debit_amount - credit_amount) FROM ledger_entries WHERE party_type = 'CUSTOMER' AND (party_id = c.id OR party_name = c.name) AND voucher_type NOT IN ('SALE', 'PAYMENT_IN', 'CREDIT_NOTE', 'OPENING_BALANCE')), 0)
+        ) as current_balance,
+        (SELECT COUNT(*) FROM sales WHERE (customer_id = c.id OR customer_name = c.name) AND status != 'CANCELLED') as total_invoices,
+        (SELECT COALESCE(SUM(grand_total), 0) FROM sales WHERE (customer_id = c.id OR customer_name = c.name) AND status != 'CANCELLED') as total_sales_amount,
+        (SELECT MAX(payment_date) FROM payments WHERE party_type = 'CUSTOMER' AND (party_id = c.id OR party_name = c.name)) as last_payment_date,
+        (SELECT MAX(date) FROM sales WHERE (customer_id = c.id OR customer_name = c.name) AND status != 'CANCELLED') as last_sale_date,
+        (SELECT MIN(date) FROM sales WHERE (customer_id = c.id OR customer_name = c.name) AND due_amount > 0 AND status != 'CANCELLED') as oldest_unpaid_sale_date,
+        (SELECT COALESCE(SUM(due_amount), 0) FROM sales WHERE (customer_id = c.id OR customer_name = c.name) AND due_amount > 0 AND status != 'CANCELLED' AND date <= date('now', '-30 days')) as unpaid_30d_amount
       FROM customers c
       WHERE 1=1
     `;
@@ -592,9 +597,13 @@ export const partyService = {
     const db = getDatabase();
     let query = `
       SELECT s.*,
-        COALESCE(s.opening_balance, 0) as current_balance,
-        (SELECT COUNT(*) FROM purchases WHERE supplier_id = s.id) as total_purchases,
-        (SELECT COALESCE(SUM(grand_total), 0) FROM purchases WHERE supplier_id = s.id AND status = 'ACTIVE') as total_purchase_amount
+        (COALESCE(s.opening_balance, 0)
+          + COALESCE((SELECT SUM(grand_total) FROM purchases WHERE (supplier_id = s.id OR supplier_name = s.name) AND status != 'CANCELLED'), 0)
+          - COALESCE((SELECT SUM(amount) FROM payments WHERE party_type = 'SUPPLIER' AND (party_id = s.id OR party_name = s.name)), 0)
+          + COALESCE((SELECT SUM(credit_amount - debit_amount) FROM ledger_entries WHERE party_type = 'SUPPLIER' AND (party_id = s.id OR party_name = s.name) AND voucher_type NOT IN ('PURCHASE', 'PAYMENT_OUT', 'OPENING_BALANCE')), 0)
+        ) as current_balance,
+        (SELECT COUNT(*) FROM purchases WHERE supplier_id = s.id OR supplier_name = s.name) as total_purchases,
+        (SELECT COALESCE(SUM(grand_total), 0) FROM purchases WHERE (supplier_id = s.id OR supplier_name = s.name) AND status = 'ACTIVE') as total_purchase_amount
       FROM suppliers s
       WHERE 1=1
     `;
