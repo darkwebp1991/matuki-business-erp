@@ -617,65 +617,6 @@ export function initDatabase() {
       );
     `);
 
-    // Seed sample advance caterer orders if table is empty
-    const advOrderCount = db.prepare('SELECT COUNT(*) as count FROM advance_orders').get();
-    if (advOrderCount.count === 0) {
-      const today = new Date().toISOString().split('T')[0];
-      const tomorrow = new Date(Date.now() + 86400000).toISOString().split('T')[0];
-
-      const insertOrd = db.prepare(`
-        INSERT INTO advance_orders (
-          order_no, customer_id, customer_name, customer_mobile, delivery_date, delivery_slot,
-          delivery_time, delivery_venue, customer_delivery_charge, driver_delivery_rate, status,
-          total_items, total_weight_kg, total_amount, advance_paid, notes
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `);
-
-      const insertItem = db.prepare(`
-        INSERT INTO advance_order_items (order_id, product_id, item_name, quantity, unit, rate, total_amount, notes)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-      `);
-
-      // Seed using real existing customer and product IDs if available
-      const custs = db.prepare('SELECT id, name, mobile FROM customers LIMIT 5').all();
-      const prods = db.prepare('SELECT id, name, selling_rate, unit FROM products LIMIT 10').all();
-
-      const c1 = custs[0] || { id: null, name: 'Paresh Caterers (પરેશ કેટરર્સ)', mobile: '+91 98251 44556' };
-      const c2 = custs[1] || { id: null, name: 'Shreeji Caterers (Bhavik Bhai)', mobile: '+91 98790 11223' };
-      const c3 = custs[2] || { id: null, name: 'Rameshwar Caterers (રમેશ્વર કેટરર્સ)', mobile: '+91 98980 66778' };
-
-      const p1 = prods[0] || { id: null, name: 'Kaju Katli Diamond Special (કાજુ કતરી)', selling_rate: 850, unit: 'KG' };
-      const p2 = prods[1] || { id: null, name: 'Shreeji Kesar Peda (કેસર પેંડા)', selling_rate: 450, unit: 'KG' };
-      const p3 = prods[2] || { id: null, name: 'Desi Ghee Motichoor Ladoo (મોતીચૂર લાડુ)', selling_rate: 380, unit: 'KG' };
-      const p4 = prods[3] || { id: null, name: 'Angoori Gulab Jamun (ગુલાબ જાંબુ)', selling_rate: 510, unit: 'KG' };
-
-      // 1. Order 1 - Today Morning
-      const ord1 = insertOrd.run(
-        'ORD-2627-001', c1.id, c1.name, c1.mobile || '+91 98251 44556', today, 'MORNING',
-        '07:30 AM', 'Sarthana (સરથાણા)', 200.0, 150.0, 'PENDING',
-        2, 45.0, 21500.0, 5000.0, 'Morning Wedding Lunch • Milton Vasan Packing'
-      );
-      insertItem.run(ord1.lastInsertRowid, p1.id, p1.name, 25.0, p1.unit || 'KG', p1.selling_rate || 480.0, 25.0 * (p1.selling_rate || 480.0), 'Fresh Soft Batch');
-      insertItem.run(ord1.lastInsertRowid, p2.id, p2.name, 20.0, p2.unit || 'KG', p2.selling_rate || 450.0, 20.0 * (p2.selling_rate || 450.0), 'Extra Kesar & Dryfruit');
-
-      // 2. Order 2 - Today Evening
-      const ord2 = insertOrd.run(
-        'ORD-2627-002', c2.id, c2.name, c2.mobile || '+91 98790 11223', today, 'EVENING',
-        '05:00 PM', 'Varachha (વરાછા)', 150.0, 120.0, 'IN_PRODUCTION',
-        2, 35.0, 15450.0, 0.0, 'Evening Reception Catering'
-      );
-      insertItem.run(ord2.lastInsertRowid, p3.id, p3.name, 20.0, p3.unit || 'KG', p3.selling_rate || 380.0, 20.0 * (p3.selling_rate || 380.0), 'Pure Desi Ghee Ladoo');
-      insertItem.run(ord2.lastInsertRowid, p4.id, p4.name, 15.0, p4.unit || 'KG', p4.selling_rate || 510.0, 15.0 * (p4.selling_rate || 510.0), 'Hot Sugar Syrup Packing');
-
-      // 3. Order 3 - Tomorrow Morning
-      const ord3 = insertOrd.run(
-        'ORD-2627-003', c3.id, c3.name, c3.mobile || '+91 98980 66778', tomorrow, 'MORNING',
-        '08:00 AM', 'Katargam (કતારગામ)', 100.0, 80.0, 'PENDING',
-        2, 50.0, 22600.0, 2000.0, 'Gajera Party Plot Delivery'
-      );
-      insertItem.run(ord3.lastInsertRowid, p1.id, p1.name, 30.0, p1.unit || 'KG', p1.selling_rate || 850.0, 30.0 * (p1.selling_rate || 850.0), 'Diamond Cut');
-      insertItem.run(ord3.lastInsertRowid, p2.id, p2.name, 20.0, p2.unit || 'KG', p2.selling_rate || 450.0, 20.0 * (p2.selling_rate || 450.0), 'Yellow Kesar Peda');
-    }
   } catch (err) {
     console.error('Error running advance orders migration:', err);
   }

@@ -859,11 +859,11 @@ export const partyService = {
         WHERE party_type = 'CUSTOMER' AND (party_id = ? OR party_name = ?)
       `).all(pId, party.name);
 
-      // Fetch Credit Notes / Ledger Returns
+      // Fetch Credit Notes / Ledger Returns (excluding OPENING_BALANCE as it is handled via master opening_balance)
       const partyLedger = db.prepare(`
         SELECT entry_date, voucher_type, voucher_no, debit_amount, credit_amount, notes
         FROM ledger_entries
-        WHERE party_type = 'CUSTOMER' AND (party_id = ? OR party_name = ?) AND voucher_type NOT IN ('SALE', 'PAYMENT_IN')
+        WHERE party_type = 'CUSTOMER' AND (party_id = ? OR party_name = ?) AND voucher_type NOT IN ('SALE', 'PAYMENT_IN', 'OPENING_BALANCE')
       `).all(pId, party.name);
 
       allEntries = [...partySales, ...partyPayments, ...partyLedger];
@@ -884,11 +884,11 @@ export const partyService = {
         WHERE party_type = 'SUPPLIER' AND (party_id = ? OR party_name = ?)
       `).all(pId, party.name);
 
-      // Fetch Debit Notes / Ledger Returns
+      // Fetch Debit Notes / Ledger Returns (excluding OPENING_BALANCE)
       const partyLedger = db.prepare(`
         SELECT entry_date, voucher_type, voucher_no, debit_amount, credit_amount, notes
         FROM ledger_entries
-        WHERE party_type = 'SUPPLIER' AND (party_id = ? OR party_name = ?) AND voucher_type NOT IN ('PURCHASE', 'PAYMENT_OUT')
+        WHERE party_type = 'SUPPLIER' AND (party_id = ? OR party_name = ?) AND voucher_type NOT IN ('PURCHASE', 'PAYMENT_OUT', 'OPENING_BALANCE')
       `).all(pId, party.name);
 
       allEntries = [...partyPurchases, ...partyPayments, ...partyLedger];

@@ -29,7 +29,12 @@ import {
 import { api } from '../../api/client';
 import { formatCurrency, formatDate, formatDateTime } from '../../utils/formatters';
 import { exportToCSV } from '../../utils/exportUtils';
-import { generateAndDownloadPartyStatementPDF, createWhatsAppStatementShareLink } from '../../utils/pdfStatementGenerator';
+import { 
+  generateAndDownloadPartyStatementPDF, 
+  createWhatsAppStatementShareLink,
+  generateAndDownloadSaleHistoryPDF,
+  generateAndDownloadPurchaseHistoryPDF
+} from '../../utils/pdfStatementGenerator';
 import { GoogleSheetPnLView } from './GoogleSheetPnLView';
 import { DriverTrip, VasanLedgerEntry, VasanYadiBill, BusinessSettings } from '../../types';
 import { VasanMasterModal } from '../settings/VasanMasterModal';
@@ -283,6 +288,26 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ settings: propSettings
     } catch (e: any) {
       console.error('Error generating PDF statement:', e);
       alert('Failed to generate PDF statement: ' + (e.message || 'Unknown error'));
+    }
+  };
+
+  const handleDownloadSaleHistoryPDF = () => {
+    if (!reportData || selectedReport !== 'sale_history') return;
+    try {
+      generateAndDownloadSaleHistoryPDF(reportData, startDate, endDate, settings);
+    } catch (e: any) {
+      console.error('Error generating Sale History PDF:', e);
+      alert('Failed to generate Sale History PDF: ' + (e.message || 'Unknown error'));
+    }
+  };
+
+  const handleDownloadPurchaseHistoryPDF = () => {
+    if (!reportData || selectedReport !== 'purchase_history') return;
+    try {
+      generateAndDownloadPurchaseHistoryPDF(reportData, startDate, endDate, settings);
+    } catch (e: any) {
+      console.error('Error generating Purchase History PDF:', e);
+      alert('Failed to generate Purchase History PDF: ' + (e.message || 'Unknown error'));
     }
   };
 
@@ -776,6 +801,14 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ settings: propSettings
                   </span>
                   <div style={{ display: 'flex', gap: '8px' }}>
                     <button
+                      className="btn btn-vyapar-red btn-sm"
+                      onClick={handleDownloadSaleHistoryPDF}
+                      style={{ fontWeight: 800, display: 'flex', alignItems: 'center', gap: '6px' }}
+                      title="Download PDF Sale Report"
+                    >
+                      <FileDown size={14} /> 📥 Download PDF
+                    </button>
+                    <button
                       className="btn btn-secondary btn-sm"
                       onClick={() => {
                         const rows = [
@@ -863,6 +896,14 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ settings: propSettings
                     Showing Supplier Purchase & Payment History ({formatDate(reportData.startDate)} to {formatDate(reportData.endDate)})
                   </span>
                   <div style={{ display: 'flex', gap: '8px' }}>
+                    <button
+                      className="btn btn-vyapar-red btn-sm"
+                      onClick={handleDownloadPurchaseHistoryPDF}
+                      style={{ fontWeight: 800, display: 'flex', alignItems: 'center', gap: '6px' }}
+                      title="Download PDF Purchase Report"
+                    >
+                      <FileDown size={14} /> 📥 Download PDF
+                    </button>
                     <button
                       className="btn btn-secondary btn-sm"
                       onClick={() => {

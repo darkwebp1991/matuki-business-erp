@@ -430,3 +430,193 @@ export const createWhatsAppStatementShareLink = (
   }
   return `https://web.whatsapp.com/send?text=${encodedMsg}`;
 };
+
+export const generateAndDownloadSaleHistoryPDF = (
+  reportData: any,
+  startDate: string,
+  endDate: string,
+  settings?: any
+) => {
+  const doc = new jsPDF({
+    orientation: 'portrait',
+    unit: 'mm',
+    format: 'a4'
+  });
+
+  const bName = (settings?.business_name || 'MATUKI SWEETS').trim();
+  const bSubtitle = (settings?.subtitle || 'Catering Wholesale & Sweets Manufacturer').trim();
+
+  // Header Box
+  doc.setFillColor(34, 197, 94); // Green Header
+  doc.rect(14, 12, 182, 20, 'F');
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(16);
+  doc.setTextColor(255, 255, 255);
+  doc.text(`${sanitizePdfText(bName)} - SALE REPORT`, 18, 22);
+
+  doc.setFontSize(9);
+  doc.setFont('helvetica', 'normal');
+  doc.text(`Customer Sales & Collection History (${formatDatePdf(startDate)} to ${formatDatePdf(endDate)})`, 18, 28);
+
+  // Totals Summary Box
+  const totals = reportData.totals || {};
+  doc.setFillColor(240, 253, 244);
+  doc.setDrawColor(34, 197, 94);
+  doc.roundedRect(14, 35, 182, 16, 2, 2, 'FD');
+
+  doc.setFontSize(8);
+  doc.setTextColor(30, 41, 59);
+
+  doc.setFont('helvetica', 'bold');
+  doc.text('TOTAL OPENING', 20, 41);
+  doc.text('TOTAL SALES', 65, 41);
+  doc.text('TOTAL JAMA', 110, 41);
+  doc.text('TOTAL CLOSING', 155, 41);
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(10);
+  doc.setTextColor(21, 128, 61);
+  doc.text(`Rs. ${formatPdfNumBold(totals.total_opening)}`, 20, 47);
+  doc.text(`Rs. ${formatPdfNumBold(totals.total_sales)}`, 65, 47);
+  doc.text(`Rs. ${formatPdfNumBold(totals.total_jama)}`, 110, 47);
+  doc.text(`Rs. ${formatPdfNumBold(totals.total_closing)}`, 155, 47);
+
+  // Table
+  const tableRows = (reportData.rows || []).map((r: any) => [
+    r.sr_no,
+    sanitizePdfText(r.name),
+    formatPdfNum(r.opening),
+    formatPdfNum(r.sales),
+    formatPdfNum(r.jama),
+    formatPdfNum(r.closing)
+  ]);
+
+  autoTable(doc, {
+    startY: 54,
+    head: [['SR NO', 'CUSTOMER NAME', 'OPENING (Rs.)', 'SALES (Rs.)', 'JAMA (Rs.)', 'CLOSING (Rs.)']],
+    body: tableRows,
+    theme: 'grid',
+    headStyles: {
+      fillColor: [37, 99, 235], // Blue head matching screenshot
+      textColor: [255, 255, 255],
+      fontStyle: 'bold',
+      fontSize: 8,
+      halign: 'center'
+    },
+    columnStyles: {
+      0: { halign: 'center', cellWidth: 16 },
+      1: { halign: 'left' },
+      2: { halign: 'right', cellWidth: 30 },
+      3: { halign: 'right', cellWidth: 30 },
+      4: { halign: 'right', cellWidth: 30 },
+      5: { halign: 'right', cellWidth: 32 }
+    },
+    styles: {
+      fontSize: 8,
+      cellPadding: 2
+    },
+    alternateRowStyles: {
+      fillColor: [248, 250, 252]
+    }
+  });
+
+  const fileName = `Sale_Report_${startDate}_to_${endDate}.pdf`;
+  doc.save(fileName);
+};
+
+export const generateAndDownloadPurchaseHistoryPDF = (
+  reportData: any,
+  startDate: string,
+  endDate: string,
+  settings?: any
+) => {
+  const doc = new jsPDF({
+    orientation: 'portrait',
+    unit: 'mm',
+    format: 'a4'
+  });
+
+  const bName = (settings?.business_name || 'MATUKI SWEETS').trim();
+
+  // Header Box
+  doc.setFillColor(248, 113, 113); // Red Header
+  doc.rect(14, 12, 182, 20, 'F');
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(16);
+  doc.setTextColor(255, 255, 255);
+  doc.text(`${sanitizePdfText(bName)} - PURCHASE REPORT`, 18, 22);
+
+  doc.setFontSize(9);
+  doc.setFont('helvetica', 'normal');
+  doc.text(`Supplier Purchase & Payment History (${formatDatePdf(startDate)} to ${formatDatePdf(endDate)})`, 18, 28);
+
+  // Totals Summary Box
+  const totals = reportData.totals || {};
+  doc.setFillColor(254, 242, 242);
+  doc.setDrawColor(248, 113, 113);
+  doc.roundedRect(14, 35, 182, 16, 2, 2, 'FD');
+
+  doc.setFontSize(8);
+  doc.setTextColor(30, 41, 59);
+
+  doc.setFont('helvetica', 'bold');
+  doc.text('TOTAL OPENING', 20, 41);
+  doc.text('TOTAL PURCHASE', 65, 41);
+  doc.text('TOTAL PAID', 110, 41);
+  doc.text('TOTAL CLOSING', 155, 41);
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(10);
+  doc.setTextColor(185, 28, 28);
+  doc.text(`Rs. ${formatPdfNumBold(totals.total_opening)}`, 20, 47);
+  doc.text(`Rs. ${formatPdfNumBold(totals.total_purchase)}`, 65, 47);
+  doc.text(`Rs. ${formatPdfNumBold(totals.total_paid)}`, 110, 47);
+  doc.text(`Rs. ${formatPdfNumBold(totals.total_closing)}`, 155, 47);
+
+  // Table
+  const tableRows = (reportData.rows || []).map((r: any) => [
+    r.sr_no,
+    sanitizePdfText(r.name),
+    r.type || 'DIRECT',
+    formatPdfNum(r.opening),
+    formatPdfNum(r.purchase),
+    formatPdfNum(r.paid),
+    formatPdfNum(r.closing)
+  ]);
+
+  autoTable(doc, {
+    startY: 54,
+    head: [['SR NO', 'SUPPLIER NAME', 'TYPE', 'OPENING (Rs.)', 'PURCHASE (Rs.)', 'PAID (Rs.)', 'CLOSING (Rs.)']],
+    body: tableRows,
+    theme: 'grid',
+    headStyles: {
+      fillColor: [37, 99, 235], // Blue head
+      textColor: [255, 255, 255],
+      fontStyle: 'bold',
+      fontSize: 8,
+      halign: 'center'
+    },
+    columnStyles: {
+      0: { halign: 'center', cellWidth: 14 },
+      1: { halign: 'left' },
+      2: { halign: 'center', cellWidth: 20 },
+      3: { halign: 'right', cellWidth: 28 },
+      4: { halign: 'right', cellWidth: 28 },
+      5: { halign: 'right', cellWidth: 28 },
+      6: { halign: 'right', cellWidth: 28 }
+    },
+    styles: {
+      fontSize: 8,
+      cellPadding: 2
+    },
+    alternateRowStyles: {
+      fillColor: [248, 250, 252]
+    }
+  });
+
+  const fileName = `Purchase_Report_${startDate}_to_${endDate}.pdf`;
+  doc.save(fileName);
+};
+

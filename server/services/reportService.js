@@ -1163,64 +1163,125 @@ export const reportService = {
     custQuery += ' ORDER BY name ASC';
 
     const customers = db.prepare(custQuery).all(...params);
+    const custIdMap = {};
+    const custNameMap = {};
+    for (const c of customers) {
+      custIdMap[c.id] = c;
+      custNameMap[c.name.trim().toUpperCase()] = c.id;
+    }
 
-    const getOpLedgerStmt = db.prepare(`
-      SELECT COALESCE(SUM(debit_amount - credit_amount), 0) as balance
-      FROM ledger_entries
-      WHERE party_type = 'CUSTOMER' 
-        AND (party_id = ? OR UPPER(TRIM(party_name)) = UPPER(TRIM(?)))
-        AND entry_date < ?
-    `);
+    // 1. Sales aggregation
+    const salesMap = {};
+    const salesRows = db.prepare(`
+      SELECT customer_id, customer_name, date, grand_total
+      FROM sales
+      WHERE status != 'CANCELLED'
+    `).all();
 
-    const getSalesStmt = db.prepare(`
-      SELECT 
-        COALESCE(SUM(CASE WHEN voucher_type = 'SALE' THEN debit_amount ELSE 0 END), 0) -
-        COALESCE(SUM(CASE WHEN voucher_type IN ('CREDIT_NOTE', 'SALES_RETURN') THEN credit_amount ELSE 0 END), 0) as sales_amount
-      FROM ledger_entries
-      WHERE party_type = 'CUSTOMER' 
-        AND (party_id = ? OR UPPER(TRIM(party_name)) = UPPER(TRIM(?)))
-        AND entry_date BETWEEN ? AND ? 
-        AND voucher_type IN ('SALE', 'CREDIT_NOTE', 'SALES_RETURN')
-    `);
+    for (const r of salesRows) {
+      let cId = r.customer_id;
+      if ((!cId || cId === 0) && r.customer_name) {
+        cId = custNameMap[r.customer_name.trim().toUpperCase()];
+      }
+      if (!cId || !custIdMap[cId]) continue;
 
-    const getJamaStmt = db.prepare(`
-      SELECT COALESCE(SUM(credit_amount), 0) as jama_amount
+      if (!salesMap[cId]) salesMap[cId] = { sales_before: 0, sales_period: 0 };
+      const amt = Number(r.grand_total || 0);
+      if (r.date < startDate) {
+        salesMap[cId].sales_before += amt;
+      } else if (r.date <= endDate) {
+        salesMap[cId].sales_period += amt;
+      }
+    }
+
+    // 2. Payments Received aggregation
+    const paymentsMap = {};
+    const paymentRows = db.prepare(`
+      SELECT party_id, party_name, payment_date, amount
+      FROM payments
+      WHERE party_type = 'CUSTOMER'
+    `).all();
+
+    for (const r of paymentRows) {
+      let cId = r.party_id;
+      if ((!cId || cId === 0) && r.party_name) {
+        cId = custNameMap[r.party_name.trim().toUpperCase()];
+      }
+      if (!cId || !custIdMap[cId]) continue;
+
+      if (!paymentsMap[cId]) paymentsMap[cId] = { pay_before: 0, pay_period: 0 };
+      const amt = Number(r.amount || 0);
+      if (r.payment_date < startDate) {
+        paymentsMap[cId].pay_before += amt;
+      } else if (r.payment_date <= endDate) {
+        paymentsMap[cId].pay_period += amt;
+      }
+    }
+
+    // 3. Other Ledger Entries aggregation (credit notes, returns, direct ledger - EXCLUDING OPENING_BALANCE)
+    const ledgerMap = {};
+    const ledgerRows = db.prepare(`
+      SELECT party_id, party_name, entry_date, debit_amount, credit_amount
       FROM ledger_entries
-      WHERE party_type = 'CUSTOMER' 
-        AND (party_id = ? OR UPPER(TRIM(party_name)) = UPPER(TRIM(?)))
-        AND entry_date BETWEEN ? AND ? 
-        AND voucher_type IN ('PAYMENT_RECEIVED', 'PAYMENT_IN')
-    `);
+      WHERE party_type = 'CUSTOMER' AND voucher_type NOT IN ('SALE', 'PAYMENT_IN', 'OPENING_BALANCE')
+    `).all();
+
+    for (const r of ledgerRows) {
+      let cId = r.party_id;
+      if ((!cId || cId === 0) && r.party_name) {
+        cId = custNameMap[r.party_name.trim().toUpperCase()];
+      }
+      if (!cId || !custIdMap[cId]) continue;
+
+      if (!ledgerMap[cId]) ledgerMap[cId] = { ledger_before: 0, ledger_debit_period: 0, ledger_credit_period: 0 };
+      const debit = Number(r.debit_amount || 0);
+      const credit = Number(r.credit_amount || 0);
+
+      if (r.entry_date < startDate) {
+        ledgerMap[cId].ledger_before += (debit - credit);
+      } else if (r.entry_date <= endDate) {
+        ledgerMap[cId].ledger_debit_period += debit;
+        ledgerMap[cId].ledger_credit_period += credit;
+      }
+    }
 
     let totOpening = 0.0;
     let totSales = 0.0;
     let totJama = 0.0;
     let totClosing = 0.0;
 
-    const rows = customers.map((c, index) => {
-      const initOp = Number(c.opening_balance) || 0.0;
-      const opLedger = getOpLedgerStmt.get(c.id, c.name, startDate).balance;
-      const opening = initOp + opLedger;
+    const rows = [];
+    let srNo = 1;
 
-      const salesAmt = getSalesStmt.get(c.id, c.name, startDate, endDate).sales_amount;
-      const jamaAmt = getJamaStmt.get(c.id, c.name, startDate, endDate).jama_amount;
+    for (const c of customers) {
+      const sData = salesMap[c.id] || { sales_before: 0, sales_period: 0 };
+      const pData = paymentsMap[c.id] || { pay_before: 0, pay_period: 0 };
+      const lData = ledgerMap[c.id] || { ledger_before: 0, ledger_debit_period: 0, ledger_credit_period: 0 };
+
+      const initOp = Number(c.opening_balance) || 0;
+      const opening = initOp + (sData.sales_before - pData.pay_before + lData.ledger_before);
+      const salesAmt = sData.sales_period + lData.ledger_debit_period;
+      const jamaAmt = pData.pay_period + lData.ledger_credit_period;
       const closing = opening + salesAmt - jamaAmt;
 
-      totOpening += opening;
-      totSales += salesAmt;
-      totJama += jamaAmt;
-      totClosing += closing;
+      // Include all parties that have non-zero balance or activity
+      if (opening !== 0 || salesAmt !== 0 || jamaAmt !== 0 || closing !== 0) {
+        totOpening += opening;
+        totSales += salesAmt;
+        totJama += jamaAmt;
+        totClosing += closing;
 
-      return {
-        sr_no: index + 1,
-        id: c.id,
-        name: c.name,
-        opening: Math.round(opening * 100) / 100,
-        sales: Math.round(salesAmt * 100) / 100,
-        jama: Math.round(jamaAmt * 100) / 100,
-        closing: Math.round(closing * 100) / 100
-      };
-    });
+        rows.push({
+          sr_no: srNo++,
+          id: c.id,
+          name: c.name,
+          opening: Math.round(opening * 100) / 100,
+          sales: Math.round(salesAmt * 100) / 100,
+          jama: Math.round(jamaAmt * 100) / 100,
+          closing: Math.round(closing * 100) / 100
+        });
+      }
+    }
 
     return {
       rows,
@@ -1251,65 +1312,125 @@ export const reportService = {
     suppQuery += ' ORDER BY name ASC';
 
     const suppliers = db.prepare(suppQuery).all(...params);
+    const suppIdMap = {};
+    const suppNameMap = {};
+    for (const s of suppliers) {
+      suppIdMap[s.id] = s;
+      suppNameMap[s.name.trim().toUpperCase()] = s.id;
+    }
 
-    const getOpLedgerStmt = db.prepare(`
-      SELECT COALESCE(SUM(credit_amount - debit_amount), 0) as balance
-      FROM ledger_entries
-      WHERE party_type = 'SUPPLIER' 
-        AND (party_id = ? OR UPPER(TRIM(party_name)) = UPPER(TRIM(?)))
-        AND entry_date < ?
-    `);
+    // 1. Purchases aggregation
+    const purMap = {};
+    const purRows = db.prepare(`
+      SELECT supplier_id, supplier_name, date, grand_total
+      FROM purchases
+      WHERE status != 'CANCELLED'
+    `).all();
 
-    const getPurchaseStmt = db.prepare(`
-      SELECT 
-        COALESCE(SUM(CASE WHEN voucher_type = 'PURCHASE' THEN credit_amount ELSE 0 END), 0) -
-        COALESCE(SUM(CASE WHEN voucher_type IN ('DEBIT_NOTE', 'PURCHASE_RETURN') THEN debit_amount ELSE 0 END), 0) as purchase_amount
-      FROM ledger_entries
-      WHERE party_type = 'SUPPLIER' 
-        AND (party_id = ? OR UPPER(TRIM(party_name)) = UPPER(TRIM(?)))
-        AND entry_date BETWEEN ? AND ? 
-        AND voucher_type IN ('PURCHASE', 'DEBIT_NOTE', 'PURCHASE_RETURN')
-    `);
+    for (const r of purRows) {
+      let sId = r.supplier_id;
+      if ((!sId || sId === 0) && r.supplier_name) {
+        sId = suppNameMap[r.supplier_name.trim().toUpperCase()];
+      }
+      if (!sId || !suppIdMap[sId]) continue;
 
-    const getPaidStmt = db.prepare(`
-      SELECT COALESCE(SUM(debit_amount), 0) as paid_amount
+      if (!purMap[sId]) purMap[sId] = { pur_before: 0, pur_period: 0 };
+      const amt = Number(r.grand_total || 0);
+      if (r.date < startDate) {
+        purMap[sId].pur_before += amt;
+      } else if (r.date <= endDate) {
+        purMap[sId].pur_period += amt;
+      }
+    }
+
+    // 2. Payments Paid aggregation
+    const paymentsMap = {};
+    const paymentRows = db.prepare(`
+      SELECT party_id, party_name, payment_date, amount
+      FROM payments
+      WHERE party_type = 'SUPPLIER'
+    `).all();
+
+    for (const r of paymentRows) {
+      let sId = r.party_id;
+      if ((!sId || sId === 0) && r.party_name) {
+        sId = suppNameMap[r.party_name.trim().toUpperCase()];
+      }
+      if (!sId || !suppIdMap[sId]) continue;
+
+      if (!paymentsMap[sId]) paymentsMap[sId] = { pay_before: 0, pay_period: 0 };
+      const amt = Number(r.amount || 0);
+      if (r.payment_date < startDate) {
+        paymentsMap[sId].pay_before += amt;
+      } else if (r.payment_date <= endDate) {
+        paymentsMap[sId].pay_period += amt;
+      }
+    }
+
+    // 3. Other Ledger Entries aggregation (debit notes, returns, direct ledger - EXCLUDING OPENING_BALANCE)
+    const ledgerMap = {};
+    const ledgerRows = db.prepare(`
+      SELECT party_id, party_name, entry_date, debit_amount, credit_amount
       FROM ledger_entries
-      WHERE party_type = 'SUPPLIER' 
-        AND (party_id = ? OR UPPER(TRIM(party_name)) = UPPER(TRIM(?)))
-        AND entry_date BETWEEN ? AND ? 
-        AND voucher_type IN ('PAYMENT_MADE', 'PAYMENT_OUT')
-    `);
+      WHERE party_type = 'SUPPLIER' AND voucher_type NOT IN ('PURCHASE', 'PAYMENT_OUT', 'OPENING_BALANCE')
+    `).all();
+
+    for (const r of ledgerRows) {
+      let sId = r.party_id;
+      if ((!sId || sId === 0) && r.party_name) {
+        sId = suppNameMap[r.party_name.trim().toUpperCase()];
+      }
+      if (!sId || !suppIdMap[sId]) continue;
+
+      if (!ledgerMap[sId]) ledgerMap[sId] = { ledger_before: 0, ledger_debit_period: 0, ledger_credit_period: 0 };
+      const debit = Number(r.debit_amount || 0);
+      const credit = Number(r.credit_amount || 0);
+
+      if (r.entry_date < startDate) {
+        ledgerMap[sId].ledger_before += (credit - debit);
+      } else if (r.entry_date <= endDate) {
+        ledgerMap[sId].ledger_credit_period += credit;
+        ledgerMap[sId].ledger_debit_period += debit;
+      }
+    }
 
     let totOpening = 0.0;
     let totPurchase = 0.0;
     let totPaid = 0.0;
     let totClosing = 0.0;
 
-    const rows = suppliers.map((s, index) => {
-      const initOp = Number(s.opening_balance) || 0.0;
-      const opLedger = getOpLedgerStmt.get(s.id, s.name, startDate).balance;
-      const opening = initOp + opLedger;
+    const rows = [];
+    let srNo = 1;
 
-      const purAmt = getPurchaseStmt.get(s.id, s.name, startDate, endDate).purchase_amount;
-      const paidAmt = getPaidStmt.get(s.id, s.name, startDate, endDate).paid_amount;
+    for (const s of suppliers) {
+      const pData = purMap[s.id] || { pur_before: 0, pur_period: 0 };
+      const payData = paymentsMap[s.id] || { pay_before: 0, pay_period: 0 };
+      const lData = ledgerMap[s.id] || { ledger_before: 0, ledger_debit_period: 0, ledger_credit_period: 0 };
+
+      const initOp = Number(s.opening_balance) || 0;
+      const opening = initOp + (pData.pur_before - payData.pay_before + lData.ledger_before);
+      const purAmt = pData.pur_period + lData.ledger_credit_period;
+      const paidAmt = payData.pay_period + lData.ledger_debit_period;
       const closing = opening + purAmt - paidAmt;
 
-      totOpening += opening;
-      totPurchase += purAmt;
-      totPaid += paidAmt;
-      totClosing += closing;
+      if (opening !== 0 || purAmt !== 0 || paidAmt !== 0 || closing !== 0) {
+        totOpening += opening;
+        totPurchase += purAmt;
+        totPaid += paidAmt;
+        totClosing += closing;
 
-      return {
-        sr_no: index + 1,
-        id: s.id,
-        name: s.name,
-        type: s.type || 'DIRECT',
-        opening: Math.round(opening * 100) / 100,
-        purchase: Math.round(purAmt * 100) / 100,
-        paid: Math.round(paidAmt * 100) / 100,
-        closing: Math.round(closing * 100) / 100
-      };
-    });
+        rows.push({
+          sr_no: srNo++,
+          id: s.id,
+          name: s.name,
+          type: s.type || 'DIRECT',
+          opening: Math.round(opening * 100) / 100,
+          purchase: Math.round(purAmt * 100) / 100,
+          paid: Math.round(paidAmt * 100) / 100,
+          closing: Math.round(closing * 100) / 100
+        });
+      }
+    }
 
     return {
       rows,
