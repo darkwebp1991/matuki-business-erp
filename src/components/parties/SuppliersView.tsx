@@ -379,7 +379,7 @@ export const SuppliersView: React.FC<SuppliersViewProps> = ({ initialSearch = ''
                         fontSize: '0.9rem',
                         color: '#dc2626'
                       }}>
-                        {Number(s.opening_balance || s.current_balance || 0).toLocaleString('en-IN')}
+                        {Number(s.current_balance ?? s.opening_balance ?? 0).toLocaleString('en-IN')}
                       </div>
                     </div>
                   </div>
@@ -667,9 +667,9 @@ export const SuppliersView: React.FC<SuppliersViewProps> = ({ initialSearch = ''
                         <td style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
                           {formatDate(p.date)}
                         </td>
-                        <td className="p-3 text-red-500 font-bold">
-                        ₹ {Number(selectedSupplier.opening_balance || selectedSupplier.current_balance || 0).toLocaleString('en-IN')}
-                      </td>
+                        <td className="p-3 text-red-500 font-bold font-mono">
+                          {formatCurrency(p.grand_total)}
+                        </td>
                         <td className="font-mono" style={{ color: 'var(--vyapar-green)' }}>
                           {formatCurrency(p.paid_amount)}
                         </td>

@@ -435,7 +435,7 @@ export const CustomersView: React.FC<CustomersViewProps> = ({ initialSearch = ''
                       fontSize: '0.9rem',
                       color: '#059669'
                     }}>
-                      {Number(c.opening_balance || c.current_balance || 0).toLocaleString('en-IN')}
+                      {Number(c.current_balance ?? c.opening_balance ?? 0).toLocaleString('en-IN')}
                     </div>
                   </div>
                 </div>
