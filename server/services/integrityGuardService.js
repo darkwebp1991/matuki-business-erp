@@ -149,6 +149,11 @@ export const integrityGuardService = {
       `).run();
       duplicateSuppDeleted = suppDupRes.changes || 0;
 
+      // 5. Clean any duplicate auto-generated RCT-S payment receipts if explicit Payment-In vouchers exist
+      const deletedRcts = db.prepare("DELETE FROM payments WHERE payment_no LIKE 'RCT-S-%'").run();
+      const deletedRctLedgers = db.prepare("DELETE FROM ledger_entries WHERE voucher_no LIKE 'RCT-S-%'").run();
+      const duplicatePaymentsCleaned = deletedRcts.changes || 0;
+
       const auditSummary = {
         timestamp: new Date().toISOString(),
         status: 'HEALTHY',
@@ -157,11 +162,12 @@ export const integrityGuardService = {
         payments_relinked: paymentsRelinked,
         ledger_relinked: ledgerRelinked,
         ledger_auto_healed: ledgerAutoHealed,
+        duplicate_payments_cleaned: duplicatePaymentsCleaned,
         duplicate_customers_cleaned: duplicateCustDeleted,
         duplicate_suppliers_cleaned: duplicateSuppDeleted
       };
 
-      console.log(`[INTEGRITY-GUARD] Audit Complete: Sales Relinked=${salesRelinked}, Purchases Relinked=${purchasesRelinked}, Payments Relinked=${paymentsRelinked}, Ledger Auto-Healed=${ledgerAutoHealed}, Duplicates Cleaned=${duplicateCustDeleted + duplicateSuppDeleted}`);
+      console.log(`[INTEGRITY-GUARD] Audit Complete: Sales Relinked=${salesRelinked}, Purchases Relinked=${purchasesRelinked}, Payments Relinked=${paymentsRelinked}, Ledger Auto-Healed=${ledgerAutoHealed}, Duplicates Cleaned=${duplicateCustDeleted + duplicateSuppDeleted + duplicatePaymentsCleaned}`);
       return auditSummary;
     });
   },
