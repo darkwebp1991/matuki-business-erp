@@ -38,6 +38,7 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
 export const api = {
   // Health
   checkHealth: () => request<any>('/health'),
+  runIntegrityAudit: () => request<any>('/integrity-guard/audit', { method: 'POST' }),
 
   // Real-Time Server-Sent Events (Instant Live Sync across PCs on LAN / WiFi)
   subscribeToEvents: (onEvent: (data: any) => void) => {

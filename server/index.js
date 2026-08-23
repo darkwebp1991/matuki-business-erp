@@ -34,6 +34,7 @@ import { eventService } from './services/eventService.js';
 import { driverTripService } from './services/driverTripService.js';
 import { autoDaybookService } from './services/autoDaybookService.js';
 import { domainRotationService } from './services/domainRotationService.js';
+import { integrityGuardService } from './services/integrityGuardService.js';
 
 // Initialize Database schema and migrations on start
 try {
@@ -70,6 +71,8 @@ try {
   autoDaybookService.initDailyScheduler();
   // Start daily 9:00 PM auto database backup scheduler
   backupService.initDailyBackupScheduler();
+  // Start 9:15 PM daily auto party integrity guard & self-healing scheduler
+  integrityGuardService.initDailyScheduler();
   // Start 10th & 25th midnight auto security domain rotation scheduler
   domainRotationService.initScheduler();
 } catch (err) {
@@ -1394,6 +1397,10 @@ const server = http.createServer(async (req, res) => {
       const body = await parseBody(req);
       const updated = attendanceService.updateBranch(Number(id), body);
       return sendJson(res, 200, { success: true, data: updated });
+    }
+    if (pathname === '/api/integrity-guard/audit' && method === 'POST') {
+      const summary = integrityGuardService.runIntegrityCheckAndAutoHeal();
+      return sendJson(res, 200, { success: true, data: summary });
     }
     if (pathname.startsWith('/api/attendance/branches/') && method === 'DELETE') {
       const id = pathname.split('/')[4];

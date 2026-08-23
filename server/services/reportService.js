@@ -1190,10 +1190,7 @@ export const reportService = {
     `).all();
 
     for (const r of salesRows) {
-      let cId = r.customer_id;
-      if ((!cId || cId === 0) && r.customer_name) {
-        cId = custNameMap[r.customer_name.trim().toUpperCase()];
-      }
+      let cId = (r.customer_name && custNameMap[r.customer_name.trim().toUpperCase()]) || r.customer_id;
       if (!cId || !custIdMap[cId]) continue;
 
       if (!salesMap[cId]) salesMap[cId] = { sales_before: 0, sales_period: 0 };
@@ -1214,10 +1211,7 @@ export const reportService = {
     `).all();
 
     for (const r of paymentRows) {
-      let cId = r.party_id;
-      if ((!cId || cId === 0) && r.party_name) {
-        cId = custNameMap[r.party_name.trim().toUpperCase()];
-      }
+      let cId = (r.party_name && custNameMap[r.party_name.trim().toUpperCase()]) || r.party_id;
       if (!cId || !custIdMap[cId]) continue;
 
       if (!paymentsMap[cId]) paymentsMap[cId] = { pay_before: 0, pay_period: 0 };
@@ -1238,10 +1232,7 @@ export const reportService = {
     `).all();
 
     for (const r of ledgerRows) {
-      let cId = r.party_id;
-      if ((!cId || cId === 0) && r.party_name) {
-        cId = custNameMap[r.party_name.trim().toUpperCase()];
-      }
+      let cId = (r.party_name && custNameMap[r.party_name.trim().toUpperCase()]) || r.party_id;
       if (!cId || !custIdMap[cId]) continue;
 
       if (!ledgerMap[cId]) ledgerMap[cId] = { ledger_before: 0, ledger_debit_period: 0, ledger_credit_period: 0 };
@@ -1339,10 +1330,7 @@ export const reportService = {
     `).all();
 
     for (const r of purRows) {
-      let sId = r.supplier_id;
-      if ((!sId || sId === 0) && r.supplier_name) {
-        sId = suppNameMap[r.supplier_name.trim().toUpperCase()];
-      }
+      let sId = (r.supplier_name && suppNameMap[r.supplier_name.trim().toUpperCase()]) || r.supplier_id;
       if (!sId || !suppIdMap[sId]) continue;
 
       if (!purMap[sId]) purMap[sId] = { pur_before: 0, pur_period: 0 };
@@ -1363,10 +1351,7 @@ export const reportService = {
     `).all();
 
     for (const r of paymentRows) {
-      let sId = r.party_id;
-      if ((!sId || sId === 0) && r.party_name) {
-        sId = suppNameMap[r.party_name.trim().toUpperCase()];
-      }
+      let sId = (r.party_name && suppNameMap[r.party_name.trim().toUpperCase()]) || r.party_id;
       if (!sId || !suppIdMap[sId]) continue;
 
       if (!paymentsMap[sId]) paymentsMap[sId] = { pay_before: 0, pay_period: 0 };
@@ -1387,10 +1372,7 @@ export const reportService = {
     `).all();
 
     for (const r of ledgerRows) {
-      let sId = r.party_id;
-      if ((!sId || sId === 0) && r.party_name) {
-        sId = suppNameMap[r.party_name.trim().toUpperCase()];
-      }
+      let sId = (r.party_name && suppNameMap[r.party_name.trim().toUpperCase()]) || r.party_id;
       if (!sId || !suppIdMap[sId]) continue;
 
       if (!ledgerMap[sId]) ledgerMap[sId] = { ledger_before: 0, ledger_debit_period: 0, ledger_credit_period: 0 };
