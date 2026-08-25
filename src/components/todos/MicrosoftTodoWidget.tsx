@@ -105,7 +105,7 @@ export const MicrosoftTodoWidget: React.FC<MicrosoftTodoWidgetProps> = ({
       }
 
       await api.createTodo(payload);
-      playNotificationChime('SYSTEM_ALERT');
+      playNotificationChime('COMPLETED');
       setQuickTitle('');
       setShowOptionsPopover(false);
       fetchTodos(true);
@@ -134,7 +134,7 @@ export const MicrosoftTodoWidget: React.FC<MicrosoftTodoWidgetProps> = ({
 
   const handleToggleStar = async (e: React.MouseEvent, id: number) => {
     e.stopPropagation();
-    setTodos(prev => prev.map(t => t.id === id ? { ...t, starred: t.starred ? 0 : 1 } : t));
+    setTodos(prev => prev.map(t => t.id === id ? { ...t, starred: (t.starred || t.is_starred) ? 0 : 1, is_starred: (t.starred || t.is_starred) ? 0 : 1 } : t));
 
     try {
       await api.toggleTodoStar(id);
@@ -591,9 +591,9 @@ export const MicrosoftTodoWidget: React.FC<MicrosoftTodoWidgetProps> = ({
                 </span>
 
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap', fontSize: '0.68rem', color: 'var(--text-secondary)' }}>
-                  {t.category && (
+                  {(t.category || t.list_category) && (
                     <span style={{ background: '#eff6ff', color: '#2563eb', padding: '1px 5px', borderRadius: '4px', fontWeight: 800 }}>
-                      {t.category}
+                      {t.category || t.list_category}
                     </span>
                   )}
                   {t.due_date && (
@@ -616,9 +616,9 @@ export const MicrosoftTodoWidget: React.FC<MicrosoftTodoWidgetProps> = ({
                   padding: '3px',
                   cursor: 'pointer'
                 }}
-                title={t.starred ? "Unmark Important" : "Mark Important"}
+                title={(t.starred || t.is_starred) ? "Unmark Important" : "Mark Important"}
               >
-                <Star size={16} fill={t.starred ? '#f59e0b' : 'none'} color={t.starred ? '#f59e0b' : '#cbd5e1'} />
+                <Star size={16} fill={(t.starred || t.is_starred) ? '#f59e0b' : 'none'} color={(t.starred || t.is_starred) ? '#f59e0b' : '#cbd5e1'} />
               </button>
 
               <button
