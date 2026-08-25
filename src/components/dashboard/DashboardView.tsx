@@ -19,7 +19,6 @@ import { InvoicePrintModal } from '../sales/InvoicePrintModal';
 import { DashboardOrderWidget } from './DashboardOrderWidget';
 import { GoalWidget } from './GoalWidget';
 import { DashboardTaskWidget } from './DashboardTaskWidget';
-import { MicrosoftTodoWidget } from '../todos/MicrosoftTodoWidget';
 import { PriceRevealAnimation } from '../common/PriceRevealAnimation';
 import { AdvanceOrder, BusinessSettings, User } from '../../types';
 import { hasModuleAccess, canEditModule } from '../../utils/permissionUtils';
@@ -331,14 +330,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             </span>
           </div>
         </div>
-      </div>
-
-      {/* Microsoft To-Do Style Daily Task Checklist Widget */}
-      <div style={{ width: '100%' }}>
-        <MicrosoftTodoWidget
-          currentUser={currentUser}
-          onNavigateToFullTodos={() => onNavigate('todos')}
-        />
       </div>
 
       {/* Advance Orders & Daily Dispatch Matrix Widget */}
