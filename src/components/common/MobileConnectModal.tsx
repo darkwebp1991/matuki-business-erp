@@ -199,6 +199,46 @@ export const MobileConnectModal: React.FC<MobileConnectModalProps> = ({
                   <li>Enjoy live mobile access to <strong>Order Planner</strong>, <strong>WhatsApp Orders</strong>, and <strong>Inventory</strong> from anywhere in the store!</li>
                 </ol>
               </div>
+
+              {/* Android Home Screen Widget App Download Box */}
+              <div style={{
+                width: '100%',
+                background: 'linear-gradient(135deg, #059669 0%, #047857 100%)',
+                color: '#ffffff',
+                borderRadius: '8px',
+                padding: '10px 14px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: '8px'
+              }}>
+                <div>
+                  <strong style={{ fontSize: '0.84rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    📲 Android Home Screen Widget (.APK)
+                  </strong>
+                  <div style={{ fontSize: '0.72rem', opacity: 0.95 }}>
+                    Place live daily tasks widget directly on your Android phone home screen
+                  </div>
+                </div>
+
+                <a
+                  href="/download/matuki-tasks-widget.apk"
+                  download="matuki-tasks-widget.apk"
+                  style={{
+                    background: '#ffffff',
+                    color: '#047857',
+                    padding: '6px 12px',
+                    borderRadius: '6px',
+                    fontWeight: 900,
+                    fontSize: '0.78rem',
+                    textDecoration: 'none',
+                    whiteSpace: 'nowrap',
+                    boxShadow: '0 2px 6px rgba(0,0,0,0.15)'
+                  }}
+                >
+                  Download .APK ⬇️
+                </a>
+              </div>
             </>
           )}
         </div>
