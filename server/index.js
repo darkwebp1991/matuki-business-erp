@@ -142,6 +142,23 @@ const server = http.createServer(async (req, res) => {
 
   const parsedUrl = url.parse(req.url, true);
   const rawPath = parsedUrl.pathname || '/';
+
+  // Handle static APK / file downloads directly
+  if (rawPath.startsWith('/download/') || rawPath === '/download') {
+    const fileName = path.basename(rawPath);
+    const filePath = path.join(process.cwd(), 'public', 'download', fileName);
+    if (fs.existsSync(filePath) && fs.statSync(filePath).isFile()) {
+      const ext = path.extname(filePath).toLowerCase();
+      const contentType = ext === '.apk' ? 'application/vnd.android.package-archive' : 'application/octet-stream';
+      res.writeHead(200, {
+        'Content-Type': contentType,
+        'Content-Length': fs.statSync(filePath).size,
+        'Content-Disposition': `attachment; filename="${fileName}"`
+      });
+      return fs.createReadStream(filePath).pipe(res);
+    }
+  }
+
   const pathname = rawPath.startsWith('/api') ? rawPath : `/api${rawPath === '/' ? '' : rawPath}`;
   const query = parsedUrl.query;
   const method = req.method;
