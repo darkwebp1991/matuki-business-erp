@@ -329,6 +329,8 @@ export function App() {
         onOpenGoogleSheetPnL={() => setActiveModule('google_sheet_pnl')}
         onOpenSettings={() => setActiveModule('settings')}
         onOpenVoiceAssistant={() => setIsVoiceAssistantOpen(true)}
+        onNavigateToTodos={() => setActiveModule('todos')}
+        todoCount={todoCount}
         onGlobalSearch={handleGlobalSearch}
         onLogout={handleLogout}
       />

@@ -17,12 +17,14 @@ import {
   Wallet,
   Eye,
   EyeOff,
-  Mic
+  Mic,
+  ListTodo
 } from 'lucide-react';
 import { BusinessSettings, User } from '../../types';
 import { MobileConnectModal } from './MobileConnectModal';
 import { WhatsAppGatewayModal } from './WhatsAppGatewayModal';
 import { VoiceSearchButton } from './VoiceSearchButton';
+import { MicrosoftTodoWidget } from '../todos/MicrosoftTodoWidget';
 import { hasModuleAccess, canEditModule } from '../../utils/permissionUtils';
 import { api } from '../../api/client';
 
@@ -41,6 +43,8 @@ interface NavbarProps {
   onOpenGoogleSheetPnL: () => void;
   onOpenSettings: () => void;
   onOpenVoiceAssistant?: () => void;
+  onNavigateToTodos?: () => void;
+  todoCount?: number;
   onLogout: () => void;
   onGlobalSearch?: (query: string) => void;
 }
@@ -60,12 +64,15 @@ export const Navbar: React.FC<NavbarProps> = ({
   onOpenGoogleSheetPnL,
   onOpenSettings,
   onOpenVoiceAssistant,
+  onNavigateToTodos,
+  todoCount = 0,
   onLogout,
   onGlobalSearch
 }) => {
   const [showAddMenuModal, setShowAddMenuModal] = useState(false);
   const [showMobileConnect, setShowMobileConnect] = useState(false);
   const [showWhatsAppGateway, setShowWhatsAppGateway] = useState(false);
+  const [showTodoDrawer, setShowTodoDrawer] = useState(false);
   const [isWAConnected, setIsWAConnected] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -277,6 +284,41 @@ export const Navbar: React.FC<NavbarProps> = ({
               <Table size={13} /> Sheet P&L
             </button>
           )}
+
+          {/* Microsoft To-Do Quick Drawer Button */}
+          <button
+            className="btn btn-secondary btn-sm"
+            onClick={() => setShowTodoDrawer(true)}
+            title="Microsoft To-Do Daily Checklist Widget"
+            style={{
+              padding: '4px 9px',
+              fontSize: '0.74rem',
+              color: '#2563eb',
+              borderColor: '#93c5fd',
+              background: '#eff6ff',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '5px',
+              fontWeight: 800,
+              position: 'relative'
+            }}
+          >
+            <ListTodo size={14} color="#2563eb" />
+            To-Do List
+            {todoCount > 0 && (
+              <span style={{
+                background: '#ef4444',
+                color: '#ffffff',
+                fontSize: '0.62rem',
+                fontWeight: 900,
+                borderRadius: '10px',
+                padding: '1px 5px',
+                lineHeight: 1
+              }}>
+                {todoCount}
+              </span>
+            )}
+          </button>
 
           {/* Theme Toggle */}
           <button
@@ -530,6 +572,39 @@ export const Navbar: React.FC<NavbarProps> = ({
           onClose={() => setShowWhatsAppGateway(false)}
           onStatusChange={setIsWAConnected}
         />
+      )}
+
+      {/* Microsoft To-Do Quick Drawer Modal */}
+      {showTodoDrawer && (
+        <div 
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0, 0, 0, 0.55)',
+            backdropFilter: 'blur(3px)',
+            zIndex: 10000,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '16px'
+          }}
+          onClick={() => setShowTodoDrawer(false)}
+        >
+          <div 
+            style={{ width: '100%', maxWidth: '480px' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <MicrosoftTodoWidget
+              currentUser={currentUser}
+              isModalOrDrawer={true}
+              onClose={() => setShowTodoDrawer(false)}
+              onNavigateToFullTodos={() => {
+                setShowTodoDrawer(false);
+                if (onNavigateToTodos) onNavigateToTodos();
+              }}
+            />
+          </div>
+        </div>
       )}
     </>
   );
