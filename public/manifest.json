@@ -1,0 +1,40 @@
+{
+  "short_name": "Matuki Tasks",
+  "name": "Matuki Sweets ERP - Daily Tasks & Business",
+  "description": "Daily Tasks, Sale Billing & Rojmel ERP for Matuki Sweets",
+  "icons": [
+    {
+      "src": "/icons/icon-192.png",
+      "type": "image/png",
+      "sizes": "192x192",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "type": "image/png",
+      "sizes": "512x512",
+      "purpose": "any maskable"
+    }
+  ],
+  "start_url": "/?source=pwa",
+  "background_color": "#0f172a",
+  "theme_color": "#1e293b",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "shortcuts": [
+    {
+      "name": "📝 Daily Tasks Widget",
+      "short_name": "Tasks",
+      "description": "Open Daily To-Do Checklist",
+      "url": "/?view=todos",
+      "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "🛒 Quick Sale Bill",
+      "short_name": "Sale",
+      "description": "Create New Sale Invoice",
+      "url": "/?action=sale",
+      "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }]
+    }
+  ]
+}

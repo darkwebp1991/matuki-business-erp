@@ -1516,6 +1516,21 @@ const server = http.createServer(async (req, res) => {
       return sendJson(res, 200, { success: true, data: updated });
     }
 
+    if (pathname.startsWith('/download/') || pathname === '/download') {
+      const fileName = path.basename(pathname);
+      const filePath = path.join(process.cwd(), 'public', 'download', fileName);
+      if (fs.existsSync(filePath) && fs.statSync(filePath).isFile()) {
+        const ext = path.extname(filePath).toLowerCase();
+        const contentType = ext === '.apk' ? 'application/vnd.android.package-archive' : 'application/octet-stream';
+        res.writeHead(200, {
+          'Content-Type': contentType,
+          'Content-Length': fs.statSync(filePath).size,
+          'Content-Disposition': `attachment; filename="${fileName}"`
+        });
+        return fs.createReadStream(filePath).pipe(res);
+      }
+    }
+
     if (pathname === '/api/system/network-info' && method === 'GET') {
       const nets = os.networkInterfaces();
       let detectedIp = 'localhost';
