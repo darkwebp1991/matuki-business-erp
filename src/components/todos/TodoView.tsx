@@ -36,6 +36,7 @@ import { formatDate } from '../../utils/formatters';
 import { playNotificationChime } from '../../hooks/useProductivityReminder';
 import { parseTaskIntent } from '../../utils/taskAiParser';
 import { TaskScreenshotModal } from './TaskScreenshotModal';
+import { MsTodoExportModal } from './MsTodoExportModal';
 
 interface TodoViewProps {
   currentUser?: User | null;
@@ -73,6 +74,7 @@ export const TodoView: React.FC<TodoViewProps> = ({ currentUser, settings }) => 
   const [selectedTaskForDetail, setSelectedTaskForDetail] = useState<TodoItem | null>(null);
   const [showCompletedSection, setShowCompletedSection] = useState(true);
   const [showScreenshotModal, setShowScreenshotModal] = useState(false);
+  const [showMsTodoModal, setShowMsTodoModal] = useState(false);
 
   // Microsoft To-Do Inline Fast-Entry State
   const [quickTitle, setQuickTitle] = useState('');
@@ -879,6 +881,27 @@ export const TodoView: React.FC<TodoViewProps> = ({ currentUser, settings }) => 
 
         {/* Sidebar Footer */}
         <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '8px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+          <button
+            type="button"
+            onClick={() => setShowMsTodoModal(true)}
+            style={{
+              width: '100%',
+              background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)',
+              color: '#ffffff',
+              border: 'none',
+              borderRadius: '8px',
+              padding: '7px 10px',
+              fontWeight: 800,
+              fontSize: '0.74rem',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '6px'
+            }}
+          >
+            ☑️ Sync Microsoft To-Do
+          </button>
           <button
             type="button"
             onClick={() => setShowScreenshotModal(true)}
@@ -2277,6 +2300,11 @@ export const TodoView: React.FC<TodoViewProps> = ({ currentUser, settings }) => 
         timeframeTitle={currentTitle}
         assignedToName={selectedUserFilter}
         settings={settings}
+      />
+      <MsTodoExportModal
+        isOpen={showMsTodoModal}
+        onClose={() => setShowMsTodoModal(false)}
+        todos={todos}
       />
     </div>
   );
