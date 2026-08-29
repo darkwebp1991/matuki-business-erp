@@ -500,6 +500,30 @@ export const todoService = {
     return text;
   },
 
+  // iCal / Google Calendar Feed Generator for Android Home Screen Widget
+  generateICalFeed() {
+    const todos = this.getTodos({ timeframe: 'TODAY' });
+    let ics = `BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//Matuki Business ERP//Daily Tasks//EN\r\nX-WR-CALNAME:Matuki Daily Tasks\r\nX-WR-TIMEZONE:Asia/Kolkata\r\n`;
+
+    todos.forEach(t => {
+      if (t.status !== 'COMPLETED') {
+        const dateStr = (t.due_date || new Date().toISOString().split('T')[0]).replace(/-/g, '');
+        const summary = (t.priority === 'HIGH' ? '🔴 ' : '📋 ') + t.title;
+        ics += `BEGIN:VEVENT\r\n`;
+        ics += `UID:todo-${t.id}@matuki.erp\r\n`;
+        ics += `SUMMARY:${summary}\r\n`;
+        ics += `DESCRIPTION:Priority: ${t.priority || 'MEDIUM'} | Assigned: ${t.assigned_to_name || 'All'}\r\n`;
+        ics += `DTSTART;VALUE=DATE:${dateStr}\r\n`;
+        ics += `DTEND;VALUE=DATE:${dateStr}\r\n`;
+        ics += `STATUS:NEEDS-ACTION\r\n`;
+        ics += `END:VEVENT\r\n`;
+      }
+    });
+
+    ics += `END:VCALENDAR\r\n`;
+    return ics;
+  },
+
   // 8:00 AM Daily WhatsApp Task Briefing Scheduler
   initDailyTaskWhatsAppScheduler() {
     console.log('⏰ Auto 8:00 AM Daily Task WhatsApp Scheduler initialized...');

@@ -1296,6 +1296,15 @@ const server = http.createServer(async (req, res) => {
       const sent = await whatsappGatewayService.sendMessage(phone, briefingText);
       return sendJson(res, 200, { success: sent, message: sent ? 'Daily tasks briefing sent to WhatsApp!' : 'WhatsApp Gateway not connected' });
     }
+    if (pathname === '/api/todos/ical' && method === 'GET') {
+      const ics = todoService.generateICalFeed();
+      res.writeHead(200, {
+        'Content-Type': 'text/calendar; charset=utf-8',
+        'Content-Disposition': 'inline; filename="matuki_tasks.ics"',
+        'Access-Control-Allow-Origin': '*'
+      });
+      return res.end(ics);
+    }
     if (pathname.startsWith('/api/todos/') && method === 'PUT') {
       const id = pathname.split('/')[3];
       const body = await parseBody(req);
