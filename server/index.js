@@ -73,6 +73,8 @@ try {
   backupService.initDailyBackupScheduler();
   // Start 9:15 PM daily auto party integrity guard & self-healing scheduler
   integrityGuardService.initDailyScheduler();
+  // Start 8:00 AM daily task WhatsApp briefing scheduler
+  todoService.initDailyTaskWhatsAppScheduler();
   // Start 10th & 25th midnight auto security domain rotation scheduler
   domainRotationService.initScheduler();
 } catch (err) {
@@ -1286,6 +1288,13 @@ const server = http.createServer(async (req, res) => {
       const result = todoService.rescheduleAllOverdueToToday(body.user_id ? Number(body.user_id) : null);
       eventService.emit({ type: 'DATA_CHANGED', module: 'todos' });
       return sendJson(res, 200, result);
+    }
+    if (pathname === '/api/todos/send-whatsapp' && method === 'POST') {
+      const body = await parseBody(req);
+      const phone = body.phone || '9081822283';
+      const briefingText = todoService.generateWhatsAppBriefingText(body.timeframe || 'TODAY', body.assignedTo || 'All');
+      const sent = await whatsappGatewayService.sendMessage(phone, briefingText);
+      return sendJson(res, 200, { success: sent, message: sent ? 'Daily tasks briefing sent to WhatsApp!' : 'WhatsApp Gateway not connected' });
     }
     if (pathname.startsWith('/api/todos/') && method === 'PUT') {
       const id = pathname.split('/')[3];

@@ -498,5 +498,25 @@ export const todoService = {
     text += `🏢 *Matuki Business ERP*`;
 
     return text;
+  },
+
+  // 8:00 AM Daily WhatsApp Task Briefing Scheduler
+  initDailyTaskWhatsAppScheduler() {
+    console.log('⏰ Auto 8:00 AM Daily Task WhatsApp Scheduler initialized...');
+    setInterval(async () => {
+      const now = new Date();
+      const hours = now.getHours();
+      const mins = now.getMinutes();
+      if (hours === 8 && mins === 0) {
+        try {
+          const briefing = this.generateWhatsAppBriefingText('TODAY', 'All');
+          const { whatsappGatewayService } = await import('./whatsappGatewayService.js');
+          await whatsappGatewayService.sendMessage('9081822283', briefing);
+          console.log('[DAILY-TASKS-WA] 8:00 AM Task Briefing dispatched to WhatsApp!');
+        } catch (e) {
+          console.error('[DAILY-TASKS-WA] Dispatch error:', e.message);
+        }
+      }
+    }, 60000);
   }
 };
