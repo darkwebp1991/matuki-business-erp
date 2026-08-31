@@ -281,7 +281,7 @@ export const TaskScreenshotModal: React.FC<TaskScreenshotModalProps> = ({
                   </div>
                   <div>
                     <h2 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 900, color: '#ffffff', letterSpacing: '-0.02em', textTransform: 'uppercase' }}>
-                      {settings?.business_name || 'MATUKI SWEETS'}
+                      MATUKI SWEETS
                     </h2>
                     <div style={{ fontSize: '0.72rem', color: '#94a3b8', fontWeight: 600 }}>
                       DAILY OPERATIONS & TASK BRIEFING (દૈનિક કામકાજ પ્લાનર)
